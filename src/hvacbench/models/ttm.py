@@ -3,13 +3,15 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
+from beartype import beartype
+from jaxtyping import Float, jaxtyped
+
 from hvacbench.config import EnvConfig
 from hvacbench.models.base import BaseTTM
-from hvacbench.schemas import FloatArray
 
 logger = logging.getLogger(__name__)
 
-class TTMForecasterModel(BaseTTM):
+class TTM(BaseTTM):
     """Wrapper for TinyTimeMixer for single-step inference within the RL env."""
 
     def __init__(
@@ -48,6 +50,9 @@ class TTMForecasterModel(BaseTTM):
         self.model = TinyTimeMixerForPrediction.from_pretrained(model_path)
         self.tsp = TimeSeriesPreprocessor.from_pretrained(model_path)
 
+        # Cache timestamp baseline to avoid continuous generation
+        self._timestamps = self._build_timestamps()
+
         self._validate_model_config()
 
         self.pipeline = TimeSeriesForecastingPipeline(
@@ -69,6 +74,20 @@ class TTMForecasterModel(BaseTTM):
                 f"Model prediction length ({self.model.config.prediction_length}) does not match config horizon ({self.prediction_length})."
             )
 
+        if sorted(self.tsp.target_columns) != sorted(self.state_vars):
+            raise ValueError(
+                f"Model target_columns ({self.tsp.target_columns}) does not match config state_variables ({self.state_vars})."
+            )
+        if sorted(self.tsp.observable_columns) != sorted(self.weather_vars):
+            raise ValueError(
+                f"Model observable_columns ({self.tsp.observable_columns}) does not match config weather_variables ({self.weather_vars})."
+            )
+        if hasattr(self.tsp, "control_columns") and self.tsp.control_columns is not None:
+            if sorted(self.tsp.control_columns) != sorted(self.control_vars):
+                raise ValueError(
+                    f"Model control_columns ({self.tsp.control_columns}) does not match config control_variables ({self.control_vars})."
+                )
+
     def _build_timestamps(self) -> pd.DatetimeIndex:
         """Generate deterministic timestamps for building input dataframes."""
         total_length = self.context_length + self.prediction_length
@@ -82,26 +101,21 @@ class TTMForecasterModel(BaseTTM):
         state_history: np.ndarray,
     ) -> pd.DataFrame:
         """Construct the past DataFrame for model input."""
-        timestamps = self._build_timestamps()[:self.context_length]
-        df = pd.DataFrame({self.timestamp_column: timestamps})
+        data = {
+            self.timestamp_column: self._timestamps[:self.context_length],
+            "series_id": 0
+        }
 
         for i, var_name in enumerate(self.state_vars):
-            df[var_name] = state_history[:, i]
+            data[var_name] = state_history[:, i].astype(np.float32, copy=True)
 
         for i, var_name in enumerate(self.weather_vars):
-            df[var_name] = weather_history[:, i]
+            data[var_name] = weather_history[:, i].astype(np.float32, copy=True)
 
         for i, var_name in enumerate(self.control_vars):
-            df[var_name] = control_history[:, i]
+            data[var_name] = control_history[:, i].astype(np.float32, copy=True)
 
-        df["series_id"] = 0
-
-        # Ensure writable arrays to avoid tsfm dataset read-only errors
-        for col in df.columns:
-            if col not in (self.timestamp_column, "series_id"):
-                df[col] = df[col].astype(np.float32).copy()
-
-        return df
+        return pd.DataFrame(data)
 
     def _build_future_dataframe(
         self,
@@ -109,47 +123,37 @@ class TTMForecasterModel(BaseTTM):
         control_plan: np.ndarray,
     ) -> pd.DataFrame:
         """Construct the future DataFrame containing known inputs."""
-        timestamps = self._build_timestamps()[self.context_length:]
-        df = pd.DataFrame({self.timestamp_column: timestamps})
+        data = {
+            self.timestamp_column: self._timestamps[self.context_length:],
+            "series_id": 0
+        }
 
         for i, var_name in enumerate(self.weather_vars):
-            df[var_name] = weather_forecast[:, i]
+            data[var_name] = weather_forecast[:, i].astype(np.float32, copy=True)
 
         for i, var_name in enumerate(self.control_vars):
-            df[var_name] = control_plan[:, i]
+            data[var_name] = control_plan[:, i].astype(np.float32, copy=True)
 
-        df["series_id"] = 0
+        return pd.DataFrame(data)
 
-        for col in df.columns:
-            if col not in (self.timestamp_column, "series_id"):
-                df[col] = df[col].astype(np.float32).copy()
-
-        return df
-
-    def _extract_predictions(self, forecast_df: pd.DataFrame) -> FloatArray:
+    def _extract_predictions(self, forecast_df: pd.DataFrame) -> Float[np.ndarray, "horizon n_states"]:
         """Extract the forecasted targets as a numpy array."""
         missing = [col for col in self.state_vars if col not in forecast_df.columns]
         if missing:
             raise ValueError(f"Forecast DataFrame is missing required target columns: {missing}")
 
-        preds: FloatArray = forecast_df[self.state_vars].to_numpy(dtype=np.float64)
-
-        if preds.shape != (self.prediction_length, self.config.n_states):
-            raise ValueError(
-                f"Expected predictions of shape {(self.prediction_length, self.config.n_states)}, "
-                f"but got {preds.shape}"
-            )
-
+        preds = forecast_df[self.state_vars].to_numpy(dtype=np.float64)
         return preds
 
+    @jaxtyped(typechecker=beartype)
     def predict(
         self,
-        weather_history: FloatArray,
-        control_history: FloatArray,
-        state_history: FloatArray,
-        weather_forecast: FloatArray,
-        control_plan: FloatArray,
-    ) -> FloatArray:
+        weather_history: Float[np.ndarray, "{self.context_length} {self.config.n_weather}"],
+        control_history: Float[np.ndarray, "{self.context_length} {self.config.n_controls}"],
+        state_history: Float[np.ndarray, "{self.context_length} {self.config.n_states}"],
+        weather_forecast: Float[np.ndarray, "{self.prediction_length} {self.config.n_weather}"],
+        control_plan: Float[np.ndarray, "{self.prediction_length} {self.config.n_controls}"],
+    ) -> Float[np.ndarray, "{self.prediction_length} {self.config.n_states}"]:
         """
         Run inference using the wrapped TinyTimeMixer model.
 
@@ -167,5 +171,4 @@ class TTMForecasterModel(BaseTTM):
         future_df = self._build_future_dataframe(weather_forecast, control_plan)
 
         forecast_df = self.pipeline(past_df, future_time_series=future_df)
-
         return self._extract_predictions(forecast_df)

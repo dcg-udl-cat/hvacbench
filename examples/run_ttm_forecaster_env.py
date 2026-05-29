@@ -4,7 +4,7 @@ from pathlib import Path
 from hvacbench.config import EnvConfig
 from hvacbench.envs.ttm_env import TTMEnv
 from hvacbench.envs.safe_env import SafeEnv
-from hvacbench.models.ttm import TTMForecasterModel
+from hvacbench.models.ttm import TTM
 from hvacbench.providers.mock import MockProvider
 from hvacbench.rewards.simple import SimpleReward
 from hvacbench.safety.control_safety import ControlSafetyFilter
@@ -21,7 +21,7 @@ def main():
 
     model_path = Path("gft/ttm4hvac")
 
-    model = TTMForecasterModel(
+    model = TTM(
         config=config,
         model_path=str(model_path),
     )

@@ -1,5 +1,6 @@
 import numpy as np
-from hvacbench.schemas import FloatArray
+from beartype import beartype
+from jaxtyping import Float, jaxtyped
 from hvacbench.config import EnvConfig
 from hvacbench.models.base import BaseTTM
 
@@ -8,16 +9,18 @@ class MockTTM(BaseTTM):
     
     def __init__(self, config: EnvConfig):
         self.config = config
-        
+
+    @jaxtyped(typechecker=beartype)
     def predict(
         self,
-        weather_history: FloatArray,
-        control_history: FloatArray,
-        state_history: FloatArray,
-        weather_forecast: FloatArray,
-        control_plan: FloatArray,
-    ) -> FloatArray:
+        weather_history: Float[np.ndarray, "{self.config.history_length} {self.config.n_weather}"],
+        control_history: Float[np.ndarray, "{self.config.history_length} {self.config.n_controls}"],
+        state_history: Float[np.ndarray, "{self.config.history_length} {self.config.n_states}"],
+        weather_forecast: Float[np.ndarray, "{self.config.horizon} {self.config.n_weather}"],
+        control_plan: Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"],
+    ) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_states}"]:
         hz = self.config.horizon
+
         predicted_states = np.zeros((hz, self.config.n_states))
         
         # Simple dynamics
