@@ -9,7 +9,11 @@ description = "A Gym-style digital twin environment for RL control of building H
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "numpy>=1.26.0",
+    "pandas>=2.0.0",
+    "granite-tsfm @ git+https://github.com/ibm-granite/granite-tsfm.git@v0.3.1",
+    "numpy>=2.4.4",
+    "transformers<4.46.0",
+    "scikit-learn<1.8.0",
 ]
 
 [project.optional-dependencies]
@@ -30,3 +34,6 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.hatch.metadata]
+allow-direct-references = true

@@ -5,7 +5,7 @@ from hvacbench.schemas import FloatArray, Observation, StepReturn
 from hvacbench.config import EnvConfig
 from hvacbench.providers.base import BaseProvider
 from hvacbench.rewards.base import RewardStrategy
-from hvacbench.models.base import BuildingModel
+from hvacbench.models.base import BaseTTM
 from hvacbench.envs.base import BaseEnv
 from hvacbench.utils.validation import validate_shape
 
@@ -17,7 +17,7 @@ class TTMEnv(BaseEnv):
         config: EnvConfig,
         provider: BaseProvider,
         reward: RewardStrategy,
-        model: BuildingModel,
+        model: BaseTTM,
     ):
         self.config = config
         self.provider = provider

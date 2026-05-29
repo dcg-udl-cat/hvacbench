@@ -1,9 +1,9 @@
 import numpy as np
 from hvacbench.schemas import FloatArray
 from hvacbench.config import EnvConfig
-from hvacbench.models.base import BuildingModel
+from hvacbench.models.base import BaseTTM
 
-class MockBuildingModel(BuildingModel):
+class MockTTM(BaseTTM):
     """Produces plausible predicted states with correct shape for testing."""
     
     def __init__(self, config: EnvConfig):

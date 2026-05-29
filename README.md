@@ -22,7 +22,7 @@ You need python `3.12` and `uv`.
 ## Installation
 
 ```sh
-uv sync
+uv sync --all-extras
 ```
 
 ## Running tests

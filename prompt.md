@@ -1,8 +1,8 @@
-You are an expert Python software engineer. Build the first version of a Python project that implements a Gym-style digital twin environment for training an RL agent to control a building HVAC system.
+You are an expert Python software engineer. You are building a Python project that implements a Gym-style digital twin environment for training an RL agent to control a building HVAC system.
 
 The goal is to create a clean, maintainable, extensible Python 3.12 project using uv for dependency management.
 
-The project should not be over-engineered, but it should follow good practices: clear structure, Python typing, dataclasses where helpful, protocols/abstract base classes for interfaces, tests, documentation, and simple examples.
+The project should not be over-engineered, but it should follow good practices: clear structure, Python typing, dataclasses where helpful, abstract base classes for interfaces, tests, documentation, and simple examples.
 
 Context
 =======

@@ -45,3 +45,10 @@ class MockProvider(BaseProvider):
         states[:, 0] = 22.0 # Temperature
         states[:, 1] = 500.0 # Power W
         return states
+
+    def get_random_action(self) -> FloatArray:
+        """Sample a random control trajectory within plausible setpoints."""
+        action = np.zeros((self.config.horizon, self.config.n_controls))
+        action[:, 0] = self.rng.uniform(18.0, 22.0, size=self.config.horizon)  # Heating
+        action[:, 1] = self.rng.uniform(22.0, 26.0, size=self.config.horizon)  # Cooling
+        return action

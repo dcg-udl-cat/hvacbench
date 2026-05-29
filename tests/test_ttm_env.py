@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from hvacbench.config import EnvConfig
 from hvacbench.providers.mock import MockProvider
-from hvacbench.models.mock import MockBuildingModel
+from hvacbench.models.mock import MockTTM
 from hvacbench.rewards.simple import SimpleReward
 from hvacbench.envs.ttm_env import TTMEnv
 
@@ -13,7 +13,7 @@ def config():
 @pytest.fixture
 def ttm_env(config):
     provider = MockProvider(config)
-    model = MockBuildingModel(config)
+    model = MockTTM(config)
     reward = SimpleReward(config)
     return TTMEnv(config=config, provider=provider, reward=reward, model=model)
 

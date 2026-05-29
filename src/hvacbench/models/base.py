@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from hvacbench.schemas import FloatArray
 
-class BuildingModel(ABC):
+class BaseTTM(ABC):
     @abstractmethod
     def predict(
         self,

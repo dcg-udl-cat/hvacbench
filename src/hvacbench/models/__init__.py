@@ -1,4 +1,5 @@
-from hvacbench.models.base import BuildingModel
-from hvacbench.models.mock import MockBuildingModel
+from hvacbench.models.base import BaseTTM
+from hvacbench.models.mock import MockTTM
+from hvacbench.models.ttm import TTMForecasterModel
 
-__all__ = ["BuildingModel", "MockBuildingModel"]
+__all__ = ["BaseTTM", "MockTTM", "TTMForecasterModel"]

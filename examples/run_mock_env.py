@@ -1,6 +1,6 @@
 from hvacbench.config import EnvConfig
 from hvacbench.providers.mock import MockProvider
-from hvacbench.models.mock import MockBuildingModel
+from hvacbench.models.mock import MockTTM
 from hvacbench.rewards.simple import SimpleReward
 from hvacbench.envs.ttm_env import TTMEnv
 from hvacbench.envs.safe_env import SafeEnv
@@ -10,7 +10,7 @@ import numpy as np
 def main():
     config = EnvConfig()
     provider = MockProvider(config=config, seed=42)
-    model = MockBuildingModel(config=config)
+    model = MockTTM(config=config)
     reward = SimpleReward(config=config)
     
     base_env = TTMEnv(config=config, provider=provider, reward=reward, model=model)

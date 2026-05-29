@@ -17,3 +17,8 @@ class BaseProvider(ABC):
     @property
     @abstractmethod
     def total_timesteps(self) -> int: ...
+
+    @abstractmethod
+    def get_random_action(self) -> FloatArray:
+        """Sample a random action for the environment."""
+        ...

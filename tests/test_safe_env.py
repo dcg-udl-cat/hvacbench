@@ -2,7 +2,7 @@ import numpy as np
 from hvacbench.safety.control_safety import ControlSafetyFilter
 from hvacbench.config import EnvConfig
 from hvacbench.providers.mock import MockProvider
-from hvacbench.models.mock import MockBuildingModel
+from hvacbench.models.mock import MockTTM
 from hvacbench.rewards.simple import SimpleReward
 from hvacbench.envs.ttm_env import TTMEnv
 from hvacbench.envs.safe_env import SafeEnv
@@ -10,7 +10,7 @@ from hvacbench.envs.safe_env import SafeEnv
 def test_safe_env_clipping_and_logic():
     config = EnvConfig(horizon=2)
     provider = MockProvider(config)
-    model = MockBuildingModel(config)
+    model = MockTTM(config)
     reward = SimpleReward(config)
     base_env = TTMEnv(config=config, provider=provider, reward=reward, model=model)
     safety_filter = ControlSafetyFilter(heating_min=15, heating_max=24, cooling_min=22, cooling_max=30)
