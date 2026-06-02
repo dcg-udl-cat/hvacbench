@@ -39,7 +39,6 @@ def main():
     )
 
     obs, info = env.reset()
-    logging.info(f"Initial obs shape: {obs.shape if hasattr(obs, 'shape') else 'unknown'}")
 
     action = provider.get_random_action()
 

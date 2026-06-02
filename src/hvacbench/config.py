@@ -25,8 +25,6 @@ class EnvConfig:
     )
 
     timestep_minutes: int = 15
-    timestamp_column: str = "time"
-    frequency: str = "15min"
 
     @property
     def n_states(self) -> int:

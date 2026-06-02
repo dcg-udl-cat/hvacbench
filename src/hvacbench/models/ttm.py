@@ -11,14 +11,15 @@ from hvacbench.models.base import BaseTTM
 
 logger = logging.getLogger(__name__)
 
+
 class TTM(BaseTTM):
     """Wrapper for TinyTimeMixer for single-step inference within the RL env."""
 
     def __init__(
-        self,
-        config: EnvConfig,
-        model_path: str = "dummy",
-        device: Optional[str] = None,
+            self,
+            config: EnvConfig,
+            model_path: str = "dummy",
+            device: Optional[str] = None,
     ) -> None:
         """
         Initializes the model wrapper.
@@ -31,9 +32,6 @@ class TTM(BaseTTM):
         self.config = config
         self.context_length = config.history_length
         self.prediction_length = config.horizon
-
-        self.timestamp_column = getattr(config, "timestamp_column", "time")
-        self.freq = getattr(config, "frequency", "15min")
 
         self.state_vars = list(config.state_variables)
         self.weather_vars = list(config.weather_variables)
@@ -50,7 +48,6 @@ class TTM(BaseTTM):
         self.model = TinyTimeMixerForPrediction.from_pretrained(model_path)
         self.tsp = TimeSeriesPreprocessor.from_pretrained(model_path)
 
-        # Cache timestamp baseline to avoid continuous generation
         self._timestamps = self._build_timestamps()
 
         self._validate_model_config()
@@ -82,27 +79,30 @@ class TTM(BaseTTM):
             raise ValueError(
                 f"Model observable_columns ({self.tsp.observable_columns}) does not match config weather_variables ({self.weather_vars})."
             )
-        if hasattr(self.tsp, "control_columns") and self.tsp.control_columns is not None:
-            if sorted(self.tsp.control_columns) != sorted(self.control_vars):
-                raise ValueError(
-                    f"Model control_columns ({self.tsp.control_columns}) does not match config control_variables ({self.control_vars})."
-                )
+        if sorted(self.tsp.control_columns) != sorted(self.control_vars):
+            raise ValueError(
+                f"Model control_columns ({self.tsp.control_columns}) does not match config control_variables ({self.control_vars})."
+            )
+        if self.tsp.freq != f"{self.config.timestep_minutes}min":
+            raise ValueError(
+                f"Model tsp config freq ({self.tsp.config.freq}) does not match expected frequency ({self.config.timestep_minutes}min)."
+            )
 
     def _build_timestamps(self) -> pd.DatetimeIndex:
         """Generate deterministic timestamps for building input dataframes."""
         total_length = self.context_length + self.prediction_length
         start_time = pd.Timestamp("2020-01-01 00:00:00")
-        return pd.date_range(start=start_time, periods=total_length, freq=self.freq)
+        return pd.date_range(start=start_time, periods=total_length, freq=self.tsp.freq)
 
     def _build_past_dataframe(
-        self,
-        weather_history: np.ndarray,
-        control_history: np.ndarray,
-        state_history: np.ndarray,
+            self,
+            weather_history: np.ndarray,
+            control_history: np.ndarray,
+            state_history: np.ndarray,
     ) -> pd.DataFrame:
         """Construct the past DataFrame for model input."""
         data = {
-            self.timestamp_column: self._timestamps[:self.context_length],
+            self.tsp.timestamp_column: self._timestamps[:self.context_length],
             "series_id": 0
         }
 
@@ -118,13 +118,13 @@ class TTM(BaseTTM):
         return pd.DataFrame(data)
 
     def _build_future_dataframe(
-        self,
-        weather_forecast: np.ndarray,
-        control_plan: np.ndarray,
+            self,
+            weather_forecast: np.ndarray,
+            control_plan: np.ndarray,
     ) -> pd.DataFrame:
         """Construct the future DataFrame containing known inputs."""
         data = {
-            self.timestamp_column: self._timestamps[self.context_length:],
+            self.tsp.timestamp_column: self._timestamps[self.context_length:],
             "series_id": 0
         }
 
@@ -147,12 +147,12 @@ class TTM(BaseTTM):
 
     @jaxtyped(typechecker=beartype)
     def predict(
-        self,
-        weather_history: Float[np.ndarray, "{self.context_length} {self.config.n_weather}"],
-        control_history: Float[np.ndarray, "{self.context_length} {self.config.n_controls}"],
-        state_history: Float[np.ndarray, "{self.context_length} {self.config.n_states}"],
-        weather_forecast: Float[np.ndarray, "{self.prediction_length} {self.config.n_weather}"],
-        control_plan: Float[np.ndarray, "{self.prediction_length} {self.config.n_controls}"],
+            self,
+            weather_history: Float[np.ndarray, "{self.context_length} {self.config.n_weather}"],
+            control_history: Float[np.ndarray, "{self.context_length} {self.config.n_controls}"],
+            state_history: Float[np.ndarray, "{self.context_length} {self.config.n_states}"],
+            weather_forecast: Float[np.ndarray, "{self.prediction_length} {self.config.n_weather}"],
+            control_plan: Float[np.ndarray, "{self.prediction_length} {self.config.n_controls}"],
     ) -> Float[np.ndarray, "{self.prediction_length} {self.config.n_states}"]:
         """
         Run inference using the wrapped TinyTimeMixer model.
