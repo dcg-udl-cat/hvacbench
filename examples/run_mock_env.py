@@ -1,4 +1,4 @@
-from hvacbench.config import EnvConfig
+from hvacbench.config import EnvConfig, TTMVariables
 from hvacbench.providers.mock import MockProvider
 from hvacbench.models.mock import MockTTM
 from hvacbench.rewards.simple import SimpleReward
@@ -12,8 +12,15 @@ def main():
     provider = MockProvider(config=config, seed=42)
     model = MockTTM(config=config)
     reward = SimpleReward(config=config)
+    variables = TTMVariables()
     
-    base_env = TTMEnv(config=config, provider=provider, reward=reward, model=model)
+    base_env = TTMEnv(
+        config=config,
+        provider=provider,
+        reward=reward,
+        model=model,
+        variables=variables,
+    )
     safety_filter = ControlSafetyFilter()
     env = SafeEnv(base_env, safety_filter=safety_filter)
     

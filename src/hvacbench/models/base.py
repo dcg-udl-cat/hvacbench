@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from jaxtyping import Float
-from hvacbench.schemas import FloatArray
 
 class BaseTTM(ABC):
     @abstractmethod

@@ -1,13 +1,14 @@
 import logging
 import numpy as np
 import pandas as pd
-from typing import Optional
+from typing import Optional, cast
 
 from beartype import beartype
 from jaxtyping import Float, jaxtyped
 
-from hvacbench.config import EnvConfig
+from hvacbench.config import EnvConfig, TTMVariables
 from hvacbench.models.base import BaseTTM
+from hvacbench.schemas import FloatArray
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class TTM(BaseTTM):
     def __init__(
             self,
             config: EnvConfig,
+            variables: TTMVariables,
             model_path: str = "dummy",
             device: Optional[str] = None,
     ) -> None:
@@ -30,12 +32,13 @@ class TTM(BaseTTM):
             device (Optional[str]): Device to run the model on ('cpu', 'cuda').
         """
         self.config = config
+        self.variables = variables
         self.context_length = config.history_length
         self.prediction_length = config.horizon
 
-        self.state_vars = list(config.state_variables)
-        self.weather_vars = list(config.weather_variables)
-        self.control_vars = list(config.control_variables)
+        self.state_vars = list(self.variables.state_names)
+        self.weather_vars = list(self.variables.weather_names)
+        self.control_vars = list(self.variables.control_names)
 
         import torch
         from tsfm_public import (
@@ -136,14 +139,13 @@ class TTM(BaseTTM):
 
         return pd.DataFrame(data)
 
-    def _extract_predictions(self, forecast_df: pd.DataFrame) -> Float[np.ndarray, "horizon n_states"]:
+    def _extract_predictions(self, forecast_df: pd.DataFrame) -> FloatArray:
         """Extract the forecasted targets as a numpy array."""
         missing = [col for col in self.state_vars if col not in forecast_df.columns]
         if missing:
             raise ValueError(f"Forecast DataFrame is missing required target columns: {missing}")
 
-        preds = forecast_df[self.state_vars].to_numpy(dtype=np.float64)
-        return preds
+        return cast(FloatArray, forecast_df[self.state_vars].to_numpy(dtype=np.float64))
 
     @jaxtyped(typechecker=beartype)
     def predict(

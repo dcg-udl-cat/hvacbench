@@ -4,7 +4,7 @@ from jaxtyping import Float, jaxtyped
 from typing import Any, Tuple
 
 from hvacbench.schemas import FloatArray, Observation, StepReturn
-from hvacbench.config import EnvConfig
+from hvacbench.config import EnvConfig, TTMVariables
 from hvacbench.providers.base import BaseProvider
 from hvacbench.rewards.base import RewardStrategy
 from hvacbench.models.base import BaseTTM
@@ -20,19 +20,42 @@ class TTMEnv(BaseEnv):
             provider: BaseProvider,
             reward: RewardStrategy,
             model: BaseTTM,
+            variables: TTMVariables = TTMVariables()
     ):
         self.config = config
         self.provider = provider
         self.reward = reward
         self.model = model
+        self.variables = variables
+        self._validate_variables()
 
-        self.t = 0
-        self.weather_history: FloatArray = np.zeros((0, 0))
-        self.control_history: FloatArray = np.zeros((0, 0))
-        self.state_history: FloatArray = np.zeros((0, 0))
+        self.current_timestep = 0
+
+        self.weather_history: FloatArray = np.zeros(
+            (self.config.history_length, self.config.n_weather),
+            dtype=np.float64,
+        )
+        self.control_history: FloatArray = np.zeros(
+            (self.config.history_length, self.config.n_controls),
+            dtype=np.float64,
+        )
+        self.state_history: FloatArray = np.zeros(
+            (self.config.history_length, self.config.n_states),
+            dtype=np.float64,
+        )
+
+        self.reset()
+
+    def _validate_variables(self) -> None:
+        if len(self.variables.state_names) != self.config.n_states:
+            raise ValueError("TTMVariables.state_vars must define exactly two states.")
+        if len(self.variables.weather_names) != self.config.n_weather:
+            raise ValueError("TTMVariables.weather_vars must define exactly four weather variables.")
+        if len(self.variables.control_names) != self.config.n_controls:
+            raise ValueError("TTMVariables.control_vars must define exactly two controls.")
 
     def reset(self) -> Tuple[Observation, dict[str, Any]]:
-        self.t = 0
+        self.current_timestep = 0
         hl = self.config.history_length
         self.weather_history = self.provider.get_initial_weather_history(hl)
         self.control_history = self.provider.get_initial_control_history(hl)
@@ -42,8 +65,8 @@ class TTMEnv(BaseEnv):
 
     def get_obs(self) -> Observation:
         hz = self.config.horizon
-        weather_forecast = self.provider.get_weather_forecast(self.t, hz)
-        energy_price_forecast = self.provider.get_energy_price_forecast(self.t, hz)
+        weather_forecast = self.provider.get_weather_forecast(self.current_timestep, hz)
+        energy_price_forecast = self.provider.get_energy_price_forecast(self.current_timestep, hz)
 
         return Observation(
             weather_history=self.weather_history.copy(),
@@ -95,9 +118,9 @@ class TTMEnv(BaseEnv):
         )
 
         self._update_histories(obs, control_plan, predicted_states)
-        self.t += 1
+        self.current_timestep += 1
 
         terminated = False
-        truncated = self.t >= self.provider.total_timesteps - self.config.horizon
+        truncated = self.current_timestep >= self.provider.total_timesteps - self.config.horizon
 
         return self.get_obs(), reward_val, terminated, truncated, info

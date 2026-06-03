@@ -16,6 +16,8 @@ dependencies = [
     "scikit-learn<1.8.0",
     "jaxtyping>=0.3.10",
     "beartype>=0.22.9",
+    "requests>=2.34.2",
+    "pydantic>=2.13.4",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +31,9 @@ dev = [
 line-length = 88
 target-version = "py313"
 
+[tool.ruff.lint]
+extend-ignore = ["F722", "F821"]
+
 [tool.mypy]
 python_version = "3.13"
 strict = true
@@ -39,3 +44,10 @@ pythonpath = ["src"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+    "pytest>=9.0.3",
+    "ruff>=0.15.12",
+]

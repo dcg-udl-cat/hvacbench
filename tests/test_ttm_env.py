@@ -1,6 +1,8 @@
 import pytest
 import numpy as np
-from hvacbench.config import EnvConfig
+from jaxtyping import TypeCheckError
+
+from hvacbench.config import EnvConfig, TTMVariables
 from hvacbench.providers.mock import MockProvider
 from hvacbench.models.mock import MockTTM
 from hvacbench.rewards.simple import SimpleReward
@@ -15,7 +17,13 @@ def ttm_env(config):
     provider = MockProvider(config)
     model = MockTTM(config)
     reward = SimpleReward(config)
-    return TTMEnv(config=config, provider=provider, reward=reward, model=model)
+    return TTMEnv(
+        config=config,
+        provider=provider,
+        reward=reward,
+        model=model,
+        variables=TTMVariables(),
+    )
 
 def test_initialization_and_reset(ttm_env, config):
     obs, info = ttm_env.reset()
@@ -45,5 +53,5 @@ def test_step(ttm_env, config):
 def test_invalid_action_shape(ttm_env, config):
     ttm_env.reset()
     action = np.ones((10, config.n_controls)) # Invalid horizon length
-    with pytest.raises(ValueError, match="Invalid shape for action"):
+    with pytest.raises(TypeCheckError):
         ttm_env.step(action)

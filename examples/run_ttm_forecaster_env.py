@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from hvacbench.config import EnvConfig
+from hvacbench.config import EnvConfig, TTMVariables
 from hvacbench.envs.ttm_env import TTMEnv
 from hvacbench.envs.safe_env import SafeEnv
 from hvacbench.models.ttm import TTM
@@ -14,6 +14,7 @@ logging.basicConfig(level=logging.INFO)
 
 def main():
     config = EnvConfig()
+    variables = TTMVariables()
 
     provider = MockProvider(config=config)
     reward = SimpleReward(config=config)
@@ -23,6 +24,7 @@ def main():
 
     model = TTM(
         config=config,
+        variables=variables,
         model_path=str(model_path),
     )
 
@@ -31,6 +33,7 @@ def main():
         provider=provider,
         reward=reward,
         model=model,
+        variables=variables,
     )
 
     env = SafeEnv(
@@ -47,4 +50,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
