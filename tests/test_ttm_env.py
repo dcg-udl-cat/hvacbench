@@ -8,6 +8,27 @@ from hvacbench.models.mock import MockTTM
 from hvacbench.rewards.simple import SimpleReward
 from hvacbench.envs.ttm_env import TTMEnv
 
+
+class RecordingMockTTM(MockTTM):
+    def __init__(self, config: EnvConfig, context_length: int):
+        super().__init__(config, context_length=context_length)
+        self.last_history_shapes = None
+
+    def predict(self, weather_history, control_history, state_history, weather_forecast, control_plan):
+        self.last_history_shapes = (
+            weather_history.shape,
+            control_history.shape,
+            state_history.shape,
+        )
+        return super().predict(
+            weather_history,
+            control_history,
+            state_history,
+            weather_forecast,
+            control_plan,
+        )
+
+
 @pytest.fixture
 def config():
     return EnvConfig(history_length=1536, horizon=96)
@@ -55,3 +76,49 @@ def test_invalid_action_shape(ttm_env, config):
     action = np.ones((10, config.n_controls)) # Invalid horizon length
     with pytest.raises(TypeCheckError):
         ttm_env.step(action)
+
+
+@pytest.mark.parametrize(
+    ("observation_history_length", "model_context_length", "buffer_length"),
+    [
+        (3, 5, 5),
+        (6, 4, 6),
+    ],
+)
+def test_observation_history_and_model_context_are_decoupled(
+    observation_history_length,
+    model_context_length,
+    buffer_length,
+):
+    config = EnvConfig(history_length=observation_history_length, horizon=2)
+    provider = MockProvider(config)
+    model = RecordingMockTTM(config, context_length=model_context_length)
+    reward = SimpleReward(config)
+    env = TTMEnv(
+        config=config,
+        provider=provider,
+        reward=reward,
+        model=model,
+        variables=TTMVariables(),
+    )
+
+    obs, _ = env.reset()
+    assert obs.weather_history.shape == (observation_history_length, config.n_weather)
+    assert obs.control_history.shape == (observation_history_length, config.n_controls)
+    assert obs.state_history.shape == (observation_history_length, config.n_states)
+
+    assert env.weather_history.shape == (buffer_length, config.n_weather)
+    assert env.control_history.shape == (buffer_length, config.n_controls)
+    assert env.state_history.shape == (buffer_length, config.n_states)
+
+    action = np.ones((config.horizon, config.n_controls)) * 22.0
+    next_obs, *_ = env.step(action)
+
+    assert model.last_history_shapes == (
+        (model_context_length, config.n_weather),
+        (model_context_length, config.n_controls),
+        (model_context_length, config.n_states),
+    )
+    assert next_obs.weather_history.shape == (observation_history_length, config.n_weather)
+    assert next_obs.control_history.shape == (observation_history_length, config.n_controls)
+    assert next_obs.state_history.shape == (observation_history_length, config.n_states)

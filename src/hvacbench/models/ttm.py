@@ -33,7 +33,6 @@ class TTM(BaseTTM):
         """
         self.config = config
         self.variables = variables
-        self.context_length = config.history_length
         self.prediction_length = config.horizon
 
         self.state_vars = list(self.variables.state_names)
@@ -50,6 +49,7 @@ class TTM(BaseTTM):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = TinyTimeMixerForPrediction.from_pretrained(model_path)
         self.tsp = TimeSeriesPreprocessor.from_pretrained(model_path)
+        self._context_length = self.model.config.context_length
 
         self._timestamps = self._build_timestamps()
 
@@ -63,12 +63,12 @@ class TTM(BaseTTM):
             explode_forecasts=True,
         )
 
+    @property
+    def context_length(self) -> int:
+        return self._context_length
+
     def _validate_model_config(self) -> None:
         """Validate that model config matches expected dimensions."""
-        if self.model.config.context_length != self.context_length:
-            raise ValueError(
-                f"Model context length ({self.model.config.context_length}) does not match config history length ({self.context_length})."
-            )
         if self.model.config.prediction_length != self.prediction_length:
             raise ValueError(
                 f"Model prediction length ({self.model.config.prediction_length}) does not match config horizon ({self.prediction_length})."

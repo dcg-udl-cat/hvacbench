@@ -28,19 +28,21 @@ class TTMEnv(BaseEnv):
         self.model = model
         self.variables = variables
         self._validate_variables()
+        self.model_context_length = self.model.context_length
+        self.history_buffer_length = max(self.config.history_length, self.model_context_length)
 
         self.current_timestep = 0
 
         self.weather_history: FloatArray = np.zeros(
-            (self.config.history_length, self.config.n_weather),
+            (self.history_buffer_length, self.config.n_weather),
             dtype=np.float64,
         )
         self.control_history: FloatArray = np.zeros(
-            (self.config.history_length, self.config.n_controls),
+            (self.history_buffer_length, self.config.n_controls),
             dtype=np.float64,
         )
         self.state_history: FloatArray = np.zeros(
-            (self.config.history_length, self.config.n_states),
+            (self.history_buffer_length, self.config.n_states),
             dtype=np.float64,
         )
 
@@ -56,7 +58,7 @@ class TTMEnv(BaseEnv):
 
     def reset(self) -> Tuple[Observation, dict[str, Any]]:
         self.current_timestep = 0
-        hl = self.config.history_length
+        hl = self.history_buffer_length
         self.weather_history = self.provider.get_initial_weather_history(hl)
         self.control_history = self.provider.get_initial_control_history(hl)
         self.state_history = self.provider.get_initial_state_history(hl)
@@ -69,21 +71,21 @@ class TTMEnv(BaseEnv):
         energy_price_forecast = self.provider.get_energy_price_forecast(self.current_timestep, hz)
 
         return Observation(
-            weather_history=self.weather_history.copy(),
-            control_history=self.control_history.copy(),
-            state_history=self.state_history.copy(),
+            weather_history=self.weather_history[-self.config.history_length:].copy(),
+            control_history=self.control_history[-self.config.history_length:].copy(),
+            state_history=self.state_history[-self.config.history_length:].copy(),
             weather_forecast=weather_forecast,
             energy_price_forecast=energy_price_forecast,
         )
 
     @jaxtyped(typechecker=beartype)
-    def _predict_next_states(self, obs: Observation, control_plan: FloatArray) \
+    def _predict_next_states(self, weather_forecast: FloatArray, control_plan: FloatArray) \
             -> Float[np.ndarray, "{self.config.horizon} {self.config.n_states}"]:
         predicted_states = self.model.predict(
-            weather_history=obs.weather_history,
-            control_history=obs.control_history,
-            state_history=obs.state_history,
-            weather_forecast=obs.weather_forecast,
+            weather_history=self.weather_history[-self.model_context_length:].copy(),
+            control_history=self.control_history[-self.model_context_length:].copy(),
+            state_history=self.state_history[-self.model_context_length:].copy(),
+            weather_forecast=weather_forecast,
             control_plan=control_plan,
         )
         return predicted_states
@@ -100,7 +102,7 @@ class TTMEnv(BaseEnv):
     @jaxtyped(typechecker=beartype)
     def step(self, control_plan: Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"]) -> StepReturn:
         obs = self.get_obs()
-        predicted_states = self._predict_next_states(obs, control_plan)
+        predicted_states = self._predict_next_states(obs.weather_forecast, control_plan)
 
         info: dict[str, Any] = {
             "predicted_states": predicted_states,

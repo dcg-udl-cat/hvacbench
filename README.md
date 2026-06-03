@@ -114,7 +114,9 @@ uv run python examples/run_bestest_air_boptest_env.py
 ```
 
 It requires a running BOPTEST service with enough workers for two simultaneous
-`bestest_air` testcase instances.
+`bestest_air` testcase instances. The example uses a small `history_length=8`
+and `horizon=8` smoke-test configuration so it finishes quickly; the default
+research configuration remains `history_length=1536` and `horizon=96`.
 
 ### bestest_air Assumptions
 

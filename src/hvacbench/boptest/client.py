@@ -273,6 +273,13 @@ class BoptestClient(BaseBoptestClient):
         )
 
     def stop(self) -> StopResponse:
+        if self._stopped:
+            return StopResponse(
+                status=200,
+                message="Already stopped.",
+                payload=StopPayload(stopped=True),
+            )
+
         response = self._send_request(
             "PUT",
             f"{self.base_url}/stop/{self.testid}",

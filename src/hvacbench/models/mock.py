@@ -7,15 +7,20 @@ from hvacbench.models.base import BaseTTM
 class MockTTM(BaseTTM):
     """Produces plausible predicted states with correct shape for testing."""
     
-    def __init__(self, config: EnvConfig):
+    def __init__(self, config: EnvConfig, context_length: int | None = None):
         self.config = config
+        self._context_length = context_length or config.history_length
+
+    @property
+    def context_length(self) -> int:
+        return self._context_length
 
     @jaxtyped(typechecker=beartype)
     def predict(
         self,
-        weather_history: Float[np.ndarray, "{self.config.history_length} {self.config.n_weather}"],
-        control_history: Float[np.ndarray, "{self.config.history_length} {self.config.n_controls}"],
-        state_history: Float[np.ndarray, "{self.config.history_length} {self.config.n_states}"],
+        weather_history: Float[np.ndarray, "{self.context_length} {self.config.n_weather}"],
+        control_history: Float[np.ndarray, "{self.context_length} {self.config.n_controls}"],
+        state_history: Float[np.ndarray, "{self.context_length} {self.config.n_states}"],
         weather_forecast: Float[np.ndarray, "{self.config.horizon} {self.config.n_weather}"],
         control_plan: Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"],
     ) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_states}"]:

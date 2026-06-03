@@ -3,6 +3,10 @@ import numpy as np
 from jaxtyping import Float
 
 class BaseTTM(ABC):
+    @property
+    @abstractmethod
+    def context_length(self) -> int: ...
+
     @abstractmethod
     def predict(
         self,

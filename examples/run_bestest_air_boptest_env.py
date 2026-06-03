@@ -9,12 +9,11 @@ from hvacbench.safety.control_safety import ControlSafetyFilter
 
 
 def main() -> None:
-    print(
-        "This example requires a running BOPTEST service with enough workers "
-        "for two simultaneous bestest_air testcase instances."
+    config = EnvConfig(
+        history_length=8,
+        horizon=96,
+        total_simulation_seconds=3 * 15 * 60,
     )
-
-    config = EnvConfig()
     testcase = BestestAir(
         base_url="http://127.0.0.1",
         energy_price_type="dynamic",
@@ -57,6 +56,8 @@ def main() -> None:
 
             if terminated or truncated:
                 break
+
+    print("Stopped BOPTEST testcases.")
 
 
 if __name__ == "__main__":
