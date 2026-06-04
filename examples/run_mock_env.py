@@ -8,7 +8,11 @@ from hvacbench.safety.control_safety import ControlSafetyFilter
 import numpy as np
 
 def main():
-    config = EnvConfig()
+    config = EnvConfig(
+        history_length=8,
+        horizon=96,
+        total_simulation_seconds= 7 * 24 * 3600
+    )
     provider = MockProvider(config=config, seed=42)
     model = MockTTM(config=config)
     reward = SimpleReward(config=config)

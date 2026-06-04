@@ -42,3 +42,18 @@ def test_safe_env_clipping_and_logic():
     # heating <= cooling holds.
     assert safe_action[1, 0] == 20.0
     assert safe_action[1, 1] == 30.0
+
+
+def test_safe_env_get_random_control_plan_delegates_and_filters():
+    config = EnvConfig(horizon=2)
+    provider = MockProvider(config)
+    model = MockTTM(config)
+    reward = SimpleReward(config)
+    base_env = TTMEnv(config=config, provider=provider, reward=reward, model=model)
+    safety_filter = ControlSafetyFilter(heating_min=21.0, heating_max=21.0)
+    env = SafeEnv(base_env, safety_filter)
+
+    control_plan = env.get_random_control_plan()
+
+    assert control_plan.shape == (config.horizon, config.n_controls)
+    assert np.all(control_plan[:, 0] == 21.0)

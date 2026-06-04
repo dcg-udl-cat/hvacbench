@@ -19,8 +19,8 @@ class TTM(BaseTTM):
     def __init__(
             self,
             config: EnvConfig,
-            variables: TTMVariables,
-            model_path: str = "dummy",
+            model_path: str,
+            variables: TTMVariables = TTMVariables(),
             device: Optional[str] = None,
     ) -> None:
         """
@@ -33,7 +33,6 @@ class TTM(BaseTTM):
         """
         self.config = config
         self.variables = variables
-        self.prediction_length = config.horizon
 
         self.state_vars = list(self.variables.state_names)
         self.weather_vars = list(self.variables.weather_names)
@@ -49,7 +48,9 @@ class TTM(BaseTTM):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = TinyTimeMixerForPrediction.from_pretrained(model_path)
         self.tsp = TimeSeriesPreprocessor.from_pretrained(model_path)
-        self._context_length = self.model.config.context_length
+        self._context_length = int(self.model.config.context_length)
+        self._prediction_length = int(self.model.config.prediction_length)
+
 
         self._timestamps = self._build_timestamps()
 
@@ -67,13 +68,12 @@ class TTM(BaseTTM):
     def context_length(self) -> int:
         return self._context_length
 
+    @property
+    def prediction_length(self) -> int:
+        return self._prediction_length
+
     def _validate_model_config(self) -> None:
         """Validate that model config matches expected dimensions."""
-        if self.model.config.prediction_length != self.prediction_length:
-            raise ValueError(
-                f"Model prediction length ({self.model.config.prediction_length}) does not match config horizon ({self.prediction_length})."
-            )
-
         if sorted(self.tsp.target_columns) != sorted(self.state_vars):
             raise ValueError(
                 f"Model target_columns ({self.tsp.target_columns}) does not match config state_variables ({self.state_vars})."
@@ -163,11 +163,11 @@ class TTM(BaseTTM):
             weather_history: Shape (history_length, n_weather)
             control_history: Shape (history_length, n_controls)
             state_history: Shape (history_length, n_states)
-            weather_forecast: Shape (horizon, n_weather)
-            control_plan: Shape (horizon, n_controls)
+            weather_forecast: Shape (prediction_length, n_weather)
+            control_plan: Shape (prediction_length, n_controls)
 
         Returns:
-            np.ndarray: Forecasted next states of shape (horizon, n_states)
+            np.ndarray: Forecasted next states of shape (prediction_length, n_states)
         """
         past_df = self._build_past_dataframe(weather_history, control_history, state_history)
         future_df = self._build_future_dataframe(weather_forecast, control_plan)

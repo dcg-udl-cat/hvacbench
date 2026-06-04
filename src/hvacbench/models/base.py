@@ -7,12 +7,16 @@ class BaseTTM(ABC):
     @abstractmethod
     def context_length(self) -> int: ...
 
+    @property
+    @abstractmethod
+    def prediction_length(self) -> int: ...
+
     @abstractmethod
     def predict(
         self,
         weather_history: Float[np.ndarray, "history_length n_weather"],
         control_history: Float[np.ndarray, "history_length n_controls"],
         state_history: Float[np.ndarray, "history_length n_states"],
-        weather_forecast: Float[np.ndarray, "horizon n_weather"],
-        control_plan: Float[np.ndarray, "horizon n_controls"],
-    ) -> Float[np.ndarray, "horizon n_states"]: ...
+        weather_forecast: Float[np.ndarray, "prediction_length n_weather"],
+        control_plan: Float[np.ndarray, "prediction_length n_controls"],
+    ) -> Float[np.ndarray, "prediction_length n_states"]: ...

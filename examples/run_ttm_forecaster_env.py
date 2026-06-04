@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from hvacbench.config import EnvConfig, TTMVariables
+from hvacbench.config import EnvConfig
 from hvacbench.envs.ttm_env import TTMEnv
 from hvacbench.envs.safe_env import SafeEnv
 from hvacbench.models.ttm import TTM
@@ -9,12 +9,17 @@ from hvacbench.providers.mock import MockProvider
 from hvacbench.rewards.simple import SimpleReward
 from hvacbench.safety.control_safety import ControlSafetyFilter
 
+from tqdm import tqdm
+
 logging.basicConfig(level=logging.INFO)
 
 
 def main():
-    config = EnvConfig()
-    variables = TTMVariables()
+    config = EnvConfig(
+        history_length=8,
+        horizon=8,
+        total_simulation_seconds=7 * 24 * 3600
+    )
 
     provider = MockProvider(config=config)
     reward = SimpleReward(config=config)
@@ -24,7 +29,6 @@ def main():
 
     model = TTM(
         config=config,
-        variables=variables,
         model_path=str(model_path),
     )
 
@@ -33,7 +37,6 @@ def main():
         provider=provider,
         reward=reward,
         model=model,
-        variables=variables,
     )
 
     env = SafeEnv(
@@ -43,10 +46,13 @@ def main():
 
     obs, info = env.reset()
 
-    action = provider.get_random_action()
+    control_plan = env.get_random_control_plan()
 
-    next_obs, reward_val, terminated, truncated, step_info = env.step(action)
-    logging.info(f"Stepped. Reward: {reward_val}, Terminated: {terminated}")
+    total_steps = (7 * 24 * 3600) / 15
+    for i in tqdm(range(int(total_steps))):
+        next_obs, reward_val, terminated, truncated, step_info = env.step(control_plan)
+
+    # logging.info(f"Stepped. Reward: {reward_val}, Terminated: {terminated}")
 
 if __name__ == "__main__":
     main()

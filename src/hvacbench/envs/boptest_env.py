@@ -111,6 +111,19 @@ class BoptestEnv(BaseEnv):
         )
 
     @jaxtyped(typechecker=beartype)
+    def get_random_control_plan(
+        self,
+    ) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"]:
+        control_plan = np.zeros(
+            (self.config.horizon, self.config.n_controls),
+            dtype=np.float64,
+        )
+        rng = np.random.default_rng()
+        control_plan[:, 0] = rng.uniform(18.0, 22.0, size=self.config.horizon)
+        control_plan[:, 1] = rng.uniform(22.0, 26.0, size=self.config.horizon)
+        return control_plan
+
+    @jaxtyped(typechecker=beartype)
     def _get_weather_forecast(
         self,
     ) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_weather}"]:

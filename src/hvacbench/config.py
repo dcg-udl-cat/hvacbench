@@ -12,7 +12,7 @@ N_CONTROLS = 2
 class EnvConfig:
     """Shared environment sizing and episode configuration."""
 
-    history_length: int = 1536
+    history_length: int = 16
     horizon: int = 96
     total_simulation_seconds: int = 14 * 24 * 3600
 

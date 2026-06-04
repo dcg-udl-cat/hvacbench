@@ -40,11 +40,18 @@ def test_construct_and_get_obs_shapes() -> None:
     env = make_env()
     obs = env.get_obs()
 
-    assert obs.weather_history.shape == (1536, 4)
-    assert obs.control_history.shape == (1536, 2)
-    assert obs.state_history.shape == (1536, 2)
-    assert obs.weather_forecast.shape == (96, 4)
-    assert obs.energy_price_forecast.shape == (96,)
+    assert obs.weather_history.shape == (env.config.history_length, 4)
+    assert obs.control_history.shape == (env.config.history_length, 2)
+    assert obs.state_history.shape == (env.config.history_length, 2)
+    assert obs.weather_forecast.shape == (env.config.horizon, 4)
+    assert obs.energy_price_forecast.shape == (env.config.horizon,)
+
+
+def test_get_random_control_plan_shape() -> None:
+    env = make_env()
+    control_plan = env.get_random_control_plan()
+
+    assert control_plan.shape == (env.config.horizon, env.config.n_controls)
 
 
 def test_forecast_conversions_and_request_length() -> None:
@@ -85,9 +92,9 @@ def test_step_rollout_sync_commit_first_and_history_updates() -> None:
     }
     assert np.allclose(info["applied_control"], control_plan[0])
 
-    assert env.weather_history.shape == (1536, 4)
-    assert env.control_history.shape == (1536, 2)
-    assert env.state_history.shape == (1536, 2)
+    assert env.weather_history.shape == (env.config.history_length, 4)
+    assert env.control_history.shape == (env.config.history_length, 2)
+    assert env.state_history.shape == (env.config.history_length, 2)
     assert np.allclose(env.weather_history[-1], weather_before)
     assert np.allclose(env.control_history[-1], control_plan[0])
     assert env.state_history[-1, 0] == pytest.approx(

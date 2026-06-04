@@ -7,13 +7,23 @@ from hvacbench.models.base import BaseTTM
 class MockTTM(BaseTTM):
     """Produces plausible predicted states with correct shape for testing."""
     
-    def __init__(self, config: EnvConfig, context_length: int | None = None):
+    def __init__(
+        self,
+        config: EnvConfig,
+        context_length: int | None = None,
+        prediction_length: int | None = None,
+    ):
         self.config = config
         self._context_length = context_length or config.history_length
+        self._prediction_length = prediction_length or config.horizon
 
     @property
     def context_length(self) -> int:
         return self._context_length
+
+    @property
+    def prediction_length(self) -> int:
+        return self._prediction_length
 
     @jaxtyped(typechecker=beartype)
     def predict(
@@ -21,10 +31,10 @@ class MockTTM(BaseTTM):
         weather_history: Float[np.ndarray, "{self.context_length} {self.config.n_weather}"],
         control_history: Float[np.ndarray, "{self.context_length} {self.config.n_controls}"],
         state_history: Float[np.ndarray, "{self.context_length} {self.config.n_states}"],
-        weather_forecast: Float[np.ndarray, "{self.config.horizon} {self.config.n_weather}"],
-        control_plan: Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"],
-    ) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_states}"]:
-        hz = self.config.horizon
+        weather_forecast: Float[np.ndarray, "{self.prediction_length} {self.config.n_weather}"],
+        control_plan: Float[np.ndarray, "{self.prediction_length} {self.config.n_controls}"],
+    ) -> Float[np.ndarray, "{self.prediction_length} {self.config.n_states}"]:
+        hz = self.prediction_length
 
         predicted_states = np.zeros((hz, self.config.n_states))
         
