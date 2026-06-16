@@ -25,7 +25,14 @@ class RecordingMockTTM(MockTTM):
         self.last_weather_forecast = None
         self.last_control_plan = None
 
-    def predict(self, weather_history, control_history, state_history, weather_forecast, control_plan):
+    def predict(
+        self,
+        weather_history,
+        control_history,
+        state_history,
+        weather_forecast,
+        control_plan,
+    ):
         self.last_history_shapes = (
             weather_history.shape,
             control_history.shape,
@@ -46,6 +53,7 @@ class RecordingMockTTM(MockTTM):
 def config():
     return EnvConfig(history_length=1536, horizon=96)
 
+
 @pytest.fixture
 def ttm_env(config):
     provider = MockProvider(config)
@@ -59,6 +67,7 @@ def ttm_env(config):
         variables=TTMVariables(),
     )
 
+
 def test_initialization_and_reset(ttm_env, config):
     obs, info = ttm_env.reset()
     assert obs.weather_history.shape == (config.history_length, config.n_weather)
@@ -68,30 +77,54 @@ def test_initialization_and_reset(ttm_env, config):
     assert obs.energy_price_forecast.shape == (config.horizon,)
     assert info == {}
 
+
 def test_step(ttm_env, config):
     ttm_env.reset()
     action = np.ones((config.horizon, config.n_controls)) * 22.0
     next_obs, reward, terminated, truncated, info = ttm_env.step(action)
-    
+
     assert isinstance(reward, float)
     assert not terminated
-    
+
     # Check histories length
     assert ttm_env.weather_history.shape == (config.history_length, config.n_weather)
     assert ttm_env.control_history.shape == (config.history_length, config.n_controls)
     assert ttm_env.state_history.shape == (config.history_length, config.n_states)
-    
+
     # Latest control should be appended to history
     assert np.allclose(ttm_env.control_history[-1], action[0])
+
+
+def test_ttm_env_truncates_from_config_not_provider_data_length():
+    config = EnvConfig(history_length=3, horizon=2, total_simulation_seconds=900)
+    provider = MockProvider(config)
+    model = MockTTM(config)
+    reward = SimpleReward(config)
+    env = TTMEnv(
+        config=config,
+        provider=provider,
+        reward=reward,
+        model=model,
+        variables=TTMVariables(),
+    )
+
+    action = np.ones((config.horizon, config.n_controls)) * 22.0
+    _next_obs, _reward, terminated, truncated, _info = env.step(action)
+
+    assert not hasattr(provider, "total_timesteps")
+    assert not terminated
+    assert truncated
+
 
 def test_get_random_control_plan_shape(ttm_env, config):
     control_plan = ttm_env.get_random_control_plan()
 
     assert control_plan.shape == (config.horizon, config.n_controls)
 
+
 def test_invalid_action_shape(ttm_env, config):
     ttm_env.reset()
-    action = np.ones((10, config.n_controls)) # Invalid horizon length
+    action = np.ones((10, config.n_controls))  # Invalid horizon length
     with pytest.raises(TypeCheckError):
         ttm_env.step(action)
 
@@ -137,8 +170,14 @@ def test_observation_history_and_model_context_are_decoupled(
         (model_context_length, config.n_controls),
         (model_context_length, config.n_states),
     )
-    assert next_obs.weather_history.shape == (observation_history_length, config.n_weather)
-    assert next_obs.control_history.shape == (observation_history_length, config.n_controls)
+    assert next_obs.weather_history.shape == (
+        observation_history_length,
+        config.n_weather,
+    )
+    assert next_obs.control_history.shape == (
+        observation_history_length,
+        config.n_controls,
+    )
     assert next_obs.state_history.shape == (observation_history_length, config.n_states)
 
 

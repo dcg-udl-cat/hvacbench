@@ -3,14 +3,14 @@ import pytest
 
 from hvacbench.boptest.bestest_air import BestestAir
 from hvacbench.boptest.mock import MockBoptestClient
+from hvacbench.energy_price import EnergyPriceType
 
 
 def test_control_conversion_celsius_to_kelvin() -> None:
     testcase = BestestAir()
     client = MockBoptestClient()
     inputs = client.control_row_to_inputs(
-        testcase,
-        np.array([21.0, 24.0], dtype=np.float64)
+        testcase, np.array([21.0, 24.0], dtype=np.float64)
     )
 
     assert inputs["con_oveTSetHea_u"] == pytest.approx(294.15)
@@ -29,7 +29,7 @@ def test_state_extraction_kelvin_to_celsius_and_hvac_power_sum() -> None:
             "fcu_reaPCoo_y": 100.0,
             "fcu_reaPFan_y": 20.0,
             "fcu_reaPHea_y": 300.0,
-        }
+        },
     )
 
     assert state.shape == (2,)
@@ -57,15 +57,21 @@ def test_weather_conversions() -> None:
 
 def test_electricity_price_point_selection() -> None:
     assert (
-        BestestAir(energy_price_type="constant").energy_price_forecast_point()
+        BestestAir(
+            energy_price_type=EnergyPriceType.CONSTANT
+        ).energy_price_forecast_point()
         == "PriceElectricPowerConstant"
     )
     assert (
-        BestestAir(energy_price_type="dynamic").energy_price_forecast_point()
+        BestestAir(
+            energy_price_type=EnergyPriceType.DYNAMIC
+        ).energy_price_forecast_point()
         == "PriceElectricPowerDynamic"
     )
     assert (
-        BestestAir(energy_price_type="highly_dynamic").energy_price_forecast_point()
+        BestestAir(
+            energy_price_type=EnergyPriceType.HIGHLY_DYNAMIC
+        ).energy_price_forecast_point()
         == "PriceElectricPowerHighlyDynamic"
     )
 
@@ -80,5 +86,5 @@ def test_missing_state_point_raises_clear_error() -> None:
                 "zon_reaTRooAir_y": 295.15,
                 "fcu_reaPCoo_y": 100.0,
                 "fcu_reaPFan_y": 20.0,
-            }
+            },
         )

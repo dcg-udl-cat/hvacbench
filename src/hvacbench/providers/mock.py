@@ -8,15 +8,10 @@ from hvacbench.providers.base import BaseProvider
 
 class MockProvider(BaseProvider):
     """Provides deterministic/pseudo-random weather/energy forecasts for testing."""
-    
-    def __init__(self, config: EnvConfig, total_timesteps: int = 10000, seed: int = 42):
-        self.config = config
-        self._total_timesteps = total_timesteps
-        self.rng = np.random.default_rng(seed)
 
-    @property
-    def total_timesteps(self) -> int:
-        return self._total_timesteps
+    def __init__(self, config: EnvConfig, seed: int = 42):
+        self.config = config
+        self.rng = np.random.default_rng(seed)
 
     @jaxtyped(typechecker=beartype)
     def get_weather_forecast(
@@ -26,11 +21,11 @@ class MockProvider(BaseProvider):
     ) -> Float[np.ndarray, "{horizon} {self.config.n_weather}"]:
         # Simplistic mock: sinusoidal temperature + random noise
         times = np.arange(t, t + horizon)
-        temp = 15.0 + 10.0 * np.sin(2 * np.pi * times / 96) # Mock daily cycle
-        humidity = np.clip(50 + 10 * np.sin(2 * np.pi * times / 96 + np.pi/2), 0, 100)
+        temp = 15.0 + 10.0 * np.sin(2 * np.pi * times / 96)  # Mock daily cycle
+        humidity = np.clip(50 + 10 * np.sin(2 * np.pi * times / 96 + np.pi / 2), 0, 100)
         wind = np.clip(self.rng.normal(3.0, 1.0, size=horizon), 0, 20)
         solar = np.clip(400 * np.sin(2 * np.pi * times / 96), 0, 1000)
-        
+
         return np.stack([temp, humidity, wind, solar], axis=1)
 
     @jaxtyped(typechecker=beartype)
@@ -57,8 +52,8 @@ class MockProvider(BaseProvider):
         history_length: int,
     ) -> Float[np.ndarray, "{history_length} {self.config.n_controls}"]:
         controls = np.zeros((history_length, self.config.n_controls))
-        controls[:, 0] = 20.0 # Heating
-        controls[:, 1] = 24.0 # Cooling
+        controls[:, 0] = 20.0  # Heating
+        controls[:, 1] = 24.0  # Cooling
         return controls
 
     @jaxtyped(typechecker=beartype)
@@ -67,12 +62,14 @@ class MockProvider(BaseProvider):
         history_length: int,
     ) -> Float[np.ndarray, "{history_length} {self.config.n_states}"]:
         states = np.zeros((history_length, self.config.n_states))
-        states[:, 0] = 22.0 # Temperature
-        states[:, 1] = 500.0 # Power W
+        states[:, 0] = 22.0  # Temperature
+        states[:, 1] = 500.0  # Power W
         return states
 
     @jaxtyped(typechecker=beartype)
-    def get_random_action(self) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"]:
+    def get_random_action(
+        self,
+    ) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"]:
         """Sample a random control trajectory within plausible setpoints."""
         action = np.zeros((self.config.horizon, self.config.n_controls))
         action[:, 0] = self.rng.uniform(18.0, 22.0, size=self.config.horizon)  # Heating

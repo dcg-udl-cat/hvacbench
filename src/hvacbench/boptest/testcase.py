@@ -1,10 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Literal
 
+from hvacbench.energy_price import EnergyPriceType
 from hvacbench.schemas import FloatArray
-
-
-EnergyPriceKind = Literal["constant", "dynamic", "highly_dynamic"]
 
 
 class BoptestTestcase(ABC):
@@ -12,7 +9,7 @@ class BoptestTestcase(ABC):
 
     name: str
     base_url: str
-    energy_price_type: EnergyPriceKind
+    energy_price_type: EnergyPriceType
     step_period_seconds: int
 
     room_temp: str

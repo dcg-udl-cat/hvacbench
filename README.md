@@ -63,6 +63,25 @@ Pass the same `variables` object to `TTMEnv` and to the real `TTM` model so the
 model preprocessor validation checks the expected state, weather, and control
 columns.
 
+Create the packaged `bestest_air` CSV provider with one of the available price
+scenarios:
+
+```python
+from hvacbench.energy_price import EnergyPriceType
+from hvacbench.providers import BestestAirCsvProvider
+
+provider = BestestAirCsvProvider(
+    config=config,
+    energy_price_type=EnergyPriceType.DYNAMIC,
+    variables=variables,
+)
+```
+
+The provider treats the annual data as cyclic, so forecasts and histories wrap
+across the end of the year instead of truncating the data source. By default it
+uses the packaged repository CSVs; pass `building_data_path` and
+`electricity_price_data_path` to load compatible CSVs from another location.
+
 ## BOPTEST bestest_air Environment
 
 `BoptestEnv` implements the same receding-horizon control contract as `TTMEnv`,
@@ -79,13 +98,14 @@ import numpy as np
 
 from hvacbench.config import EnvConfig
 from hvacbench.boptest.bestest_air import BestestAir
+from hvacbench.energy_price import EnergyPriceType
 from hvacbench.envs.boptest_env import BoptestEnv
 from hvacbench.rewards.simple import SimpleReward
 
 config = EnvConfig()
 testcase = BestestAir(
     base_url="http://127.0.0.1",
-    energy_price_type="dynamic",  # "constant", "dynamic", or "highly_dynamic"
+    energy_price_type=EnergyPriceType.DYNAMIC,
 )
 reward = SimpleReward(config=config)
 

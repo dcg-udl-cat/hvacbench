@@ -15,12 +15,12 @@ class TTMEnv(BaseEnv):
     """Environment backed by a forecasting model / digital twin."""
 
     def __init__(
-            self,
-            config: EnvConfig,
-            provider: BaseProvider,
-            reward: RewardStrategy,
-            model: BaseTTM,
-            variables: TTMVariables = TTMVariables()
+        self,
+        config: EnvConfig,
+        provider: BaseProvider,
+        reward: RewardStrategy,
+        model: BaseTTM,
+        variables: TTMVariables = TTMVariables(),
     ):
         self.config = config
         self.provider = provider
@@ -31,7 +31,9 @@ class TTMEnv(BaseEnv):
         self.model_prediction_length = int(self.model.prediction_length)
         self._validate_prediction_length()
         self.model_context_length = self.model.context_length
-        self.history_buffer_length = max(self.config.history_length, self.model_context_length)
+        self.history_buffer_length = max(
+            self.config.history_length, self.model_context_length
+        )
 
         self.current_timestep = 0
 
@@ -54,9 +56,13 @@ class TTMEnv(BaseEnv):
         if len(self.variables.state_names) != self.config.n_states:
             raise ValueError("TTMVariables.state_vars must define exactly two states.")
         if len(self.variables.weather_names) != self.config.n_weather:
-            raise ValueError("TTMVariables.weather_vars must define exactly four weather variables.")
+            raise ValueError(
+                "TTMVariables.weather_vars must define exactly four weather variables."
+            )
         if len(self.variables.control_names) != self.config.n_controls:
-            raise ValueError("TTMVariables.control_vars must define exactly two controls.")
+            raise ValueError(
+                "TTMVariables.control_vars must define exactly two controls."
+            )
 
     def _validate_prediction_length(self) -> None:
         if self.config.horizon > self.model_prediction_length:
@@ -78,12 +84,14 @@ class TTMEnv(BaseEnv):
     def get_obs(self) -> Observation:
         hz = self.config.horizon
         weather_forecast = self.provider.get_weather_forecast(self.current_timestep, hz)
-        energy_price_forecast = self.provider.get_energy_price_forecast(self.current_timestep, hz)
+        energy_price_forecast = self.provider.get_energy_price_forecast(
+            self.current_timestep, hz
+        )
 
         return Observation(
-            weather_history=self.weather_history[-self.config.history_length:].copy(),
-            control_history=self.control_history[-self.config.history_length:].copy(),
-            state_history=self.state_history[-self.config.history_length:].copy(),
+            weather_history=self.weather_history[-self.config.history_length :].copy(),
+            control_history=self.control_history[-self.config.history_length :].copy(),
+            state_history=self.state_history[-self.config.history_length :].copy(),
             weather_forecast=weather_forecast,
             energy_price_forecast=energy_price_forecast,
         )
@@ -125,30 +133,44 @@ class TTMEnv(BaseEnv):
         return np.concatenate([control_plan, replayed_tail], axis=0)
 
     @jaxtyped(typechecker=beartype)
-    def _predict_next_states(self, weather_forecast: FloatArray, control_plan: FloatArray) \
-            -> Float[np.ndarray, "{self.config.horizon} {self.config.n_states}"]:
+    def _predict_next_states(
+        self, weather_forecast: FloatArray, control_plan: FloatArray
+    ) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_states}"]:
         model_weather_forecast = self._get_model_weather_forecast(weather_forecast)
         model_control_plan = self._get_model_control_plan(control_plan)
         predicted_states = self.model.predict(
-            weather_history=self.weather_history[-self.model_context_length:].copy(),
-            control_history=self.control_history[-self.model_context_length:].copy(),
-            state_history=self.state_history[-self.model_context_length:].copy(),
+            weather_history=self.weather_history[-self.model_context_length :].copy(),
+            control_history=self.control_history[-self.model_context_length :].copy(),
+            state_history=self.state_history[-self.model_context_length :].copy(),
             weather_forecast=model_weather_forecast,
             control_plan=model_control_plan,
         )
         return predicted_states[: self.config.horizon]
 
-    def _update_histories(self, obs: Observation, control_plan: FloatArray, predicted_states: FloatArray) -> None:
+    def _update_histories(
+        self, obs: Observation, control_plan: FloatArray, predicted_states: FloatArray
+    ) -> None:
         applied_control = control_plan[0:1]
         next_state = predicted_states[0:1]
         next_weather = obs.weather_forecast[0:1]
 
-        self.control_history = np.concatenate([self.control_history[1:], applied_control], axis=0)
-        self.state_history = np.concatenate([self.state_history[1:], next_state], axis=0)
-        self.weather_history = np.concatenate([self.weather_history[1:], next_weather], axis=0)
+        self.control_history = np.concatenate(
+            [self.control_history[1:], applied_control], axis=0
+        )
+        self.state_history = np.concatenate(
+            [self.state_history[1:], next_state], axis=0
+        )
+        self.weather_history = np.concatenate(
+            [self.weather_history[1:], next_weather], axis=0
+        )
 
     @jaxtyped(typechecker=beartype)
-    def step(self, control_plan: Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"]) -> StepReturn:
+    def step(
+        self,
+        control_plan: Float[
+            np.ndarray, "{self.config.horizon} {self.config.n_controls}"
+        ],
+    ) -> StepReturn:
         obs = self.get_obs()
         predicted_states = self._predict_next_states(obs.weather_forecast, control_plan)
 
@@ -171,6 +193,7 @@ class TTMEnv(BaseEnv):
         self.current_timestep += 1
 
         terminated = False
-        truncated = self.current_timestep >= self.provider.total_timesteps - self.config.horizon
+        elapsed_seconds = self.current_timestep * self.config.step_period_seconds
+        truncated = elapsed_seconds >= self.config.total_simulation_seconds
 
         return self.get_obs(), reward_val, terminated, truncated, info

@@ -3,13 +3,14 @@ from dataclasses import dataclass
 import numpy as np
 from jaxtyping import Float
 
-from hvacbench.boptest.testcase import BoptestTestcase, EnergyPriceKind
+from hvacbench.boptest.testcase import BoptestTestcase
+from hvacbench.energy_price import EnergyPriceType
 
 
-PRICE_FORECAST_POINTS: dict[EnergyPriceKind, str] = {
-    "constant": "PriceElectricPowerConstant",
-    "dynamic": "PriceElectricPowerDynamic",
-    "highly_dynamic": "PriceElectricPowerHighlyDynamic",
+PRICE_FORECAST_POINTS: dict[EnergyPriceType, str] = {
+    EnergyPriceType.CONSTANT: "PriceElectricPowerConstant",
+    EnergyPriceType.DYNAMIC: "PriceElectricPowerDynamic",
+    EnergyPriceType.HIGHLY_DYNAMIC: "PriceElectricPowerHighlyDynamic",
 }
 
 
@@ -18,7 +19,7 @@ class BestestAir(BoptestTestcase):
     """Hardcoded BOPTEST mapping for the bestest_air testcase."""
 
     base_url: str = "http://127.0.0.1"
-    energy_price_type: EnergyPriceKind = "dynamic"
+    energy_price_type: EnergyPriceType = EnergyPriceType.DYNAMIC
 
     name: str = "bestest_air"
     step_period_seconds: int = 900
@@ -40,6 +41,13 @@ class BestestAir(BoptestTestcase):
 
     default_heating_setpoint_c: float = 21.0
     default_cooling_setpoint_c: float = 24.0
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "energy_price_type",
+            EnergyPriceType(self.energy_price_type),
+        )
 
     def required_input_points(self) -> frozenset[str]:
         return frozenset(
