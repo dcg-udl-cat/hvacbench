@@ -49,6 +49,48 @@ class RecordingMockTTM(MockTTM):
         )
 
 
+class RecordingProvider(MockProvider):
+    def __init__(self, config: EnvConfig):
+        super().__init__(config)
+        self.initial_weather_history_calls: list[tuple[int, int]] = []
+        self.initial_control_history_calls: list[tuple[int, int]] = []
+        self.initial_state_history_calls: list[tuple[int, int]] = []
+        self.weather_forecast_calls: list[tuple[int, int]] = []
+        self.energy_price_forecast_calls: list[tuple[int, int]] = []
+
+    def get_weather_forecast(self, t: int, horizon: int):
+        self.weather_forecast_calls.append((t, horizon))
+        return super().get_weather_forecast(t, horizon)
+
+    def get_energy_price_forecast(self, t: int, horizon: int):
+        self.energy_price_forecast_calls.append((t, horizon))
+        return super().get_energy_price_forecast(t, horizon)
+
+    def get_initial_weather_history(
+        self,
+        history_length: int,
+        start_timestep: int = 0,
+    ):
+        self.initial_weather_history_calls.append((history_length, start_timestep))
+        return super().get_initial_weather_history(history_length, start_timestep)
+
+    def get_initial_control_history(
+        self,
+        history_length: int,
+        start_timestep: int = 0,
+    ):
+        self.initial_control_history_calls.append((history_length, start_timestep))
+        return super().get_initial_control_history(history_length, start_timestep)
+
+    def get_initial_state_history(
+        self,
+        history_length: int,
+        start_timestep: int = 0,
+    ):
+        self.initial_state_history_calls.append((history_length, start_timestep))
+        return super().get_initial_state_history(history_length, start_timestep)
+
+
 @pytest.fixture
 def config():
     return EnvConfig(history_length=1536, horizon=96)
@@ -114,6 +156,72 @@ def test_ttm_env_truncates_from_config_not_provider_data_length():
     assert not hasattr(provider, "total_timesteps")
     assert not terminated
     assert truncated
+
+
+def test_start_day_offsets_provider_timestep_without_changing_episode_time():
+    config = EnvConfig(history_length=3, horizon=2)
+    provider = RecordingProvider(config)
+    model = MockTTM(config)
+    reward = SimpleReward(config)
+    env = TTMEnv(
+        config=config,
+        provider=provider,
+        reward=reward,
+        model=model,
+        variables=TTMVariables(),
+        start_day=2,
+    )
+
+    expected_start_timestep = 2 * 24 * 3600 // config.step_period_seconds
+    assert env.current_timestep == 0
+    assert env.start_timestep == expected_start_timestep
+    assert provider.initial_weather_history_calls[-1] == (
+        config.history_length,
+        expected_start_timestep,
+    )
+    assert provider.initial_control_history_calls[-1] == (
+        config.history_length,
+        expected_start_timestep,
+    )
+    assert provider.initial_state_history_calls[-1] == (
+        config.history_length,
+        expected_start_timestep,
+    )
+    assert provider.weather_forecast_calls[-1] == (
+        expected_start_timestep,
+        config.horizon,
+    )
+    assert provider.energy_price_forecast_calls[-1] == (
+        expected_start_timestep,
+        config.horizon,
+    )
+
+    action = np.ones((config.horizon, config.n_controls)) * 22.0
+    env.step(action)
+
+    assert env.current_timestep == 1
+    assert provider.weather_forecast_calls[-1] == (
+        expected_start_timestep + 1,
+        config.horizon,
+    )
+    assert provider.energy_price_forecast_calls[-1] == (
+        expected_start_timestep + 1,
+        config.horizon,
+    )
+
+
+def test_start_day_must_be_non_negative():
+    config = EnvConfig(history_length=3, horizon=2)
+
+    with pytest.raises(ValueError, match="start_day"):
+        TTMEnv(
+            config=config,
+            provider=MockProvider(config),
+            reward=SimpleReward(config),
+            model=MockTTM(config),
+            variables=TTMVariables(),
+            start_day=-1,
+        )
 
 
 def test_get_random_control_plan_shape(ttm_env, config):

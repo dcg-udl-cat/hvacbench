@@ -14,10 +14,12 @@ from hvacbench.rewards.base import RewardStrategy
 from hvacbench.schemas import FloatArray, Observation, StepReturn
 
 
+SECONDS_PER_DAY = 24 * 60 * 60
+
+
 class BoptestEnv(BaseEnv):
     """BOPTEST-backed receding-horizon environment for bestest_air."""
 
-    _START_TIME_SECONDS = 0
     _WARMUP_PERIOD_SECONDS = 0
 
     def __init__(
@@ -27,16 +29,21 @@ class BoptestEnv(BaseEnv):
         testcase: Optional[BoptestTestcase] = None,
         main_client: Optional[BaseBoptestClient] = None,
         rollout_client: Optional[BaseBoptestClient] = None,
+        start_day: int = 0,
     ) -> None:
         self.config = config
         self.reward = reward
         self.testcase = testcase or BestestAir()
+        self.start_day = int(start_day)
+        if self.start_day < 0:
+            raise ValueError("start_day must be greater than or equal to 0.")
+        self.start_time_seconds = self.start_day * SECONDS_PER_DAY
 
         self.main_client = main_client or BoptestClient(self.testcase.base_url)
         self.rollout_client = rollout_client or BoptestClient(self.testcase.base_url)
         self._validate_clients()
 
-        self.current_time_seconds = self._START_TIME_SECONDS
+        self.current_time_seconds = self.start_time_seconds
         self.elapsed_episode_seconds = 0
         self._committed_controls: list[FloatArray] = []
 
@@ -66,7 +73,7 @@ class BoptestEnv(BaseEnv):
             )
 
     def reset(self) -> Tuple[Observation, dict[str, Any]]:
-        self.current_time_seconds = self._START_TIME_SECONDS
+        self.current_time_seconds = self.start_time_seconds
         self.elapsed_episode_seconds = 0
         self._committed_controls = []
 
@@ -77,7 +84,7 @@ class BoptestEnv(BaseEnv):
         self._advance_initial_context(self.rollout_client)
 
         self.current_time_seconds = (
-            self._START_TIME_SECONDS
+            self.start_time_seconds
             + self.config.history_length * self.testcase.step_period_seconds
         )
         self._initialize_histories_from_results(initial_weather_history)
@@ -89,7 +96,7 @@ class BoptestEnv(BaseEnv):
         client.set_step(self.testcase.step_period_seconds)
         client.set_scenario(self.testcase.energy_price_type)
         client.initialize(
-            start_time_seconds=self._START_TIME_SECONDS,
+            start_time_seconds=self.start_time_seconds,
             warmup_period_seconds=self._WARMUP_PERIOD_SECONDS,
         )
 

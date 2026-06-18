@@ -14,6 +14,7 @@ def make_env(
     *,
     main_client: MockBoptestClient | None = None,
     rollout_client: MockBoptestClient | None = None,
+    start_day: int = 0,
 ) -> BoptestEnv:
     config = EnvConfig()
     reward = SimpleReward(config)
@@ -22,6 +23,7 @@ def make_env(
         config=config,
         main_client=main_client or MockBoptestClient(testid="main"),
         rollout_client=rollout_client or MockBoptestClient(testid="rollout"),
+        start_day=start_day,
     )
 
 
@@ -45,6 +47,48 @@ def test_construct_and_get_obs_shapes() -> None:
     assert obs.state_history.shape == (env.config.history_length, 2)
     assert obs.weather_forecast.shape == (env.config.horizon, 4)
     assert obs.energy_price_forecast.shape == (env.config.horizon,)
+
+
+def test_start_day_sets_boptest_initialize_start_time() -> None:
+    main_client = MockBoptestClient(testid="main")
+    rollout_client = MockBoptestClient(testid="rollout")
+    env = make_env(
+        main_client=main_client,
+        rollout_client=rollout_client,
+        start_day=3,
+    )
+    expected_start_time_seconds = 3 * 24 * 3600
+
+    assert env.start_time_seconds == expected_start_time_seconds
+    assert main_client.initialize_calls[-1] == {
+        "start_time_seconds": expected_start_time_seconds,
+        "warmup_period_seconds": 0,
+    }
+    assert rollout_client.initialize_calls[-1] == {
+        "start_time_seconds": expected_start_time_seconds,
+        "warmup_period_seconds": 0,
+    }
+    assert env.current_time_seconds == (
+        expected_start_time_seconds
+        + env.config.history_length * env.testcase.step_period_seconds
+    )
+    assert main_client.results_calls[-1]["start_time_seconds"] == (
+        expected_start_time_seconds
+    )
+    assert main_client.results_calls[-1]["final_time_seconds"] == env.current_time_seconds
+
+
+def test_boptest_start_day_must_be_non_negative() -> None:
+    config = EnvConfig()
+
+    with pytest.raises(ValueError, match="start_day"):
+        BoptestEnv(
+            reward=SimpleReward(config),
+            config=config,
+            main_client=MockBoptestClient(testid="main"),
+            rollout_client=MockBoptestClient(testid="rollout"),
+            start_day=-1,
+        )
 
 
 def test_get_random_control_plan_shape() -> None:

@@ -11,13 +11,25 @@ class BaseProvider(ABC):
     def get_energy_price_forecast(self, t: int, horizon: int) -> FloatArray: ...
 
     @abstractmethod
-    def get_initial_weather_history(self, history_length: int) -> FloatArray: ...
+    def get_initial_weather_history(
+        self,
+        history_length: int,
+        start_timestep: int = 0,
+    ) -> FloatArray: ...
 
     @abstractmethod
-    def get_initial_control_history(self, history_length: int) -> FloatArray: ...
+    def get_initial_control_history(
+        self,
+        history_length: int,
+        start_timestep: int = 0,
+    ) -> FloatArray: ...
 
     @abstractmethod
-    def get_initial_state_history(self, history_length: int) -> FloatArray: ...
+    def get_initial_state_history(
+        self,
+        history_length: int,
+        start_timestep: int = 0,
+    ) -> FloatArray: ...
 
     @abstractmethod
     def get_random_action(self) -> FloatArray:

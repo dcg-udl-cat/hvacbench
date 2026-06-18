@@ -52,13 +52,20 @@ class BestestAirCsvProvider(BaseProvider):
             usecols=[self.energy_price_type.value],
         )
 
-        self._weather = self._extract_matrix(building_df, self.variables.weather_names)
-        self._controls = self._extract_matrix(
+        self._weather: FloatArray = self._extract_matrix(
+            building_df,
+            self.variables.weather_names,
+        )
+        self._controls: FloatArray = self._extract_matrix(
             building_df,
             self.variables.control_names,
         )
-        self._states = self._extract_matrix(building_df, self.variables.state_names)
-        self._energy_prices = price_df[self.energy_price_type.value].to_numpy(
+        self._states: FloatArray = self._extract_matrix(
+            building_df,
+            self.variables.state_names,
+        )
+        self._energy_prices: FloatArray = np.asarray(
+            price_df[self.energy_price_type.value].to_numpy(dtype=np.float64),
             dtype=np.float64,
         )
 
@@ -77,28 +84,42 @@ class BestestAirCsvProvider(BaseProvider):
         horizon: int,
     ) -> Float[np.ndarray, "{horizon}"]:
         indices = self._cyclic_indices(t, horizon)
-        return self._energy_prices[indices].copy()
+        return np.asarray(self._energy_prices[indices], dtype=np.float64).copy()
 
     @jaxtyped(typechecker=beartype)
     def get_initial_weather_history(
         self,
         history_length: int,
+        start_timestep: int = 0,
     ) -> Float[np.ndarray, "{history_length} {self.config.n_weather}"]:
-        return self.get_weather_forecast(-history_length, history_length)
+        return self.get_weather_forecast(
+            start_timestep - history_length,
+            history_length,
+        )
 
     @jaxtyped(typechecker=beartype)
     def get_initial_control_history(
         self,
         history_length: int,
+        start_timestep: int = 0,
     ) -> Float[np.ndarray, "{history_length} {self.config.n_controls}"]:
-        return self._cyclic_rows(self._controls, -history_length, history_length)
+        return self._cyclic_rows(
+            self._controls,
+            start_timestep - history_length,
+            history_length,
+        )
 
     @jaxtyped(typechecker=beartype)
     def get_initial_state_history(
         self,
         history_length: int,
+        start_timestep: int = 0,
     ) -> Float[np.ndarray, "{history_length} {self.config.n_states}"]:
-        return self._cyclic_rows(self._states, -history_length, history_length)
+        return self._cyclic_rows(
+            self._states,
+            start_timestep - history_length,
+            history_length,
+        )
 
     @jaxtyped(typechecker=beartype)
     def get_random_action(
@@ -119,7 +140,7 @@ class BestestAirCsvProvider(BaseProvider):
         horizon: int,
     ) -> FloatArray:
         indices = self._cyclic_indices(t, horizon)
-        return values[indices].copy()
+        return np.asarray(values[indices], dtype=np.float64).copy()
 
     def _cyclic_indices(self, t: int, length: int) -> np.ndarray:
         return np.mod(
@@ -128,7 +149,10 @@ class BestestAirCsvProvider(BaseProvider):
 
     @staticmethod
     def _extract_matrix(df: pd.DataFrame, columns: Sequence[str]) -> FloatArray:
-        return df.loc[:, list(columns)].to_numpy(dtype=np.float64)
+        return np.asarray(
+            df.loc[:, list(columns)].to_numpy(dtype=np.float64),
+            dtype=np.float64,
+        )
 
     @classmethod
     def _read_csv(

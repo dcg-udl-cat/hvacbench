@@ -82,6 +82,10 @@ across the end of the year instead of truncating the data source. By default it
 uses the packaged repository CSVs; pass `building_data_path` and
 `electricity_price_data_path` to load compatible CSVs from another location.
 
+`TTMEnv(start_day=0)` starts provider lookups at day 0 by default. Pass a
+different non-negative day to offset both initial histories and forecasts into
+the provider data without changing the configured episode length.
+
 ## BOPTEST bestest_air Environment
 
 `BoptestEnv` implements the same receding-horizon control contract as `TTMEnv`,
@@ -113,6 +117,7 @@ env = BoptestEnv(
     reward=reward,
     config=config,
     testcase=testcase,
+    start_day=0,
 )
 
 control_plan = np.tile(
@@ -151,6 +156,9 @@ research configuration remains `history_length=1536` and `horizon=96`.
 - The electricity price forecast point is selected from
   `PriceElectricPowerConstant`, `PriceElectricPowerDynamic`, or
   `PriceElectricPowerHighlyDynamic` based on `BestestAir.energy_price_type`.
+- `start_day` is converted to BOPTEST `start_time` seconds during
+  `/initialize`; after that, the environment advances the configured initial
+  history context before the first control step.
 - BOPTEST `/forecast` returns `horizon / interval + 1` rows, so the environment
   requests `(steps - 1) * 900` seconds to receive exactly `steps` rows.
 - BOPTEST `/results` is used only for measurement points. Forecast-only weather

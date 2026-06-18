@@ -43,14 +43,20 @@ class MockProvider(BaseProvider):
     def get_initial_weather_history(
         self,
         history_length: int,
+        start_timestep: int = 0,
     ) -> Float[np.ndarray, "{history_length} {self.config.n_weather}"]:
-        return self.get_weather_forecast(-history_length, history_length)
+        return self.get_weather_forecast(
+            start_timestep - history_length,
+            history_length,
+        )
 
     @jaxtyped(typechecker=beartype)
     def get_initial_control_history(
         self,
         history_length: int,
+        start_timestep: int = 0,
     ) -> Float[np.ndarray, "{history_length} {self.config.n_controls}"]:
+        del start_timestep
         controls = np.zeros((history_length, self.config.n_controls))
         controls[:, 0] = 20.0  # Heating
         controls[:, 1] = 24.0  # Cooling
@@ -60,7 +66,9 @@ class MockProvider(BaseProvider):
     def get_initial_state_history(
         self,
         history_length: int,
+        start_timestep: int = 0,
     ) -> Float[np.ndarray, "{history_length} {self.config.n_states}"]:
+        del start_timestep
         states = np.zeros((history_length, self.config.n_states))
         states[:, 0] = 22.0  # Temperature
         states[:, 1] = 500.0  # Power W

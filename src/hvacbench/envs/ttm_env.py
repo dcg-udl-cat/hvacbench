@@ -11,6 +11,9 @@ from hvacbench.models.base import BaseTTM
 from hvacbench.envs.base import BaseEnv
 
 
+SECONDS_PER_DAY = 24 * 60 * 60
+
+
 class TTMEnv(BaseEnv):
     """Environment backed by a forecasting model / digital twin."""
 
@@ -21,12 +24,17 @@ class TTMEnv(BaseEnv):
         reward: RewardStrategy,
         model: BaseTTM,
         variables: TTMVariables = TTMVariables(),
+        start_day: int = 0,
     ):
         self.config = config
         self.provider = provider
         self.reward = reward
         self.model = model
         self.variables = variables
+        self.start_day = int(start_day)
+        if self.start_day < 0:
+            raise ValueError("start_day must be greater than or equal to 0.")
+        self.start_timestep = self._start_timestep_from_day(self.start_day)
         self._validate_variables()
         self.model_prediction_length = int(self.model.prediction_length)
         self._validate_prediction_length()
@@ -52,6 +60,13 @@ class TTMEnv(BaseEnv):
 
         self.reset()
 
+    def _start_timestep_from_day(self, start_day: int) -> int:
+        start_seconds = start_day * SECONDS_PER_DAY
+        return start_seconds // self.config.step_period_seconds
+
+    def _provider_timestep(self) -> int:
+        return self.start_timestep + self.current_timestep
+
     def _validate_variables(self) -> None:
         if len(self.variables.state_names) != self.config.n_states:
             raise ValueError("TTMVariables.state_vars must define exactly two states.")
@@ -75,17 +90,28 @@ class TTMEnv(BaseEnv):
     def reset(self) -> Tuple[Observation, dict[str, Any]]:
         self.current_timestep = 0
         hl = self.history_buffer_length
-        self.weather_history = self.provider.get_initial_weather_history(hl)
-        self.control_history = self.provider.get_initial_control_history(hl)
-        self.state_history = self.provider.get_initial_state_history(hl)
+        self.weather_history = self.provider.get_initial_weather_history(
+            hl,
+            start_timestep=self.start_timestep,
+        )
+        self.control_history = self.provider.get_initial_control_history(
+            hl,
+            start_timestep=self.start_timestep,
+        )
+        self.state_history = self.provider.get_initial_state_history(
+            hl,
+            start_timestep=self.start_timestep,
+        )
 
         return self.get_obs(), {}
 
     def get_obs(self) -> Observation:
         hz = self.config.horizon
-        weather_forecast = self.provider.get_weather_forecast(self.current_timestep, hz)
+        provider_timestep = self._provider_timestep()
+        weather_forecast = self.provider.get_weather_forecast(provider_timestep, hz)
         energy_price_forecast = self.provider.get_energy_price_forecast(
-            self.current_timestep, hz
+            provider_timestep,
+            hz,
         )
 
         return Observation(
@@ -113,7 +139,7 @@ class TTMEnv(BaseEnv):
         if self.model_prediction_length == self.config.horizon:
             return weather_forecast
         return self.provider.get_weather_forecast(
-            self.current_timestep,
+            self._provider_timestep(),
             self.model_prediction_length,
         )
 
