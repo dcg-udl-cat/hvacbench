@@ -1,4 +1,5 @@
-from typing import Any, Optional, Tuple
+from abc import ABC
+from typing import Optional
 
 import numpy as np
 from beartype import beartype
@@ -12,14 +13,14 @@ from hvacbench.config import EnvConfig
 from hvacbench.energy_price import EnergyPriceType
 from hvacbench.envs.base import BaseEnv
 from hvacbench.rewards.base import RewardStrategy
-from hvacbench.schemas import FloatArray, Observation, StepReturn
+from hvacbench.schemas import FloatArray, Observation
 
 
 SECONDS_PER_DAY = 24 * 60 * 60
 
 
-class BoptestEnv(BaseEnv):
-    """BOPTEST-backed receding-horizon environment for bestest_air."""
+class BaseBoptestEnv(BaseEnv, ABC):
+    """Shared mechanics for BOPTEST-backed environments."""
 
     _WARMUP_PERIOD_SECONDS = 0
 
@@ -30,7 +31,6 @@ class BoptestEnv(BaseEnv):
         energy_price_type: EnergyPriceType = EnergyPriceType.DYNAMIC,
         testcase: Optional[BoptestTestcase] = None,
         main_client: Optional[BaseBoptestClient] = None,
-        rollout_client: Optional[BaseBoptestClient] = None,
         start_day: int = 0,
     ) -> None:
         self.config = config
@@ -42,12 +42,9 @@ class BoptestEnv(BaseEnv):
         self.start_time_seconds = self.start_day * SECONDS_PER_DAY
 
         self.main_client = main_client or BoptestClient(self.testcase.base_url)
-        self.rollout_client = rollout_client or BoptestClient(self.testcase.base_url)
-        self._validate_clients()
 
         self.current_time_seconds = self.start_time_seconds
         self.elapsed_episode_seconds = 0
-        self._committed_controls: list[FloatArray] = []
 
         self.weather_history: FloatArray = np.zeros(
             (self.config.history_length, self.config.n_weather),
@@ -62,37 +59,19 @@ class BoptestEnv(BaseEnv):
             dtype=np.float64,
         )
 
-        try:
-            self.reset()
-        except Exception:
-            self.close()
-            raise
-
-    def _validate_clients(self) -> None:
-        if self.main_client.testid == self.rollout_client.testid:
-            raise ValueError(
-                "Main BOPTEST client and rollout client must have different testids."
-            )
-
-    def reset(self) -> Tuple[Observation, dict[str, Any]]:
+    def _reset_main_client_context(self) -> None:
         self.current_time_seconds = self.start_time_seconds
         self.elapsed_episode_seconds = 0
-        self._committed_controls = []
 
         self._initialize_client(self.main_client)
-        self._initialize_client(self.rollout_client)
         initial_weather_history = self._get_initial_weather_history_forecast()
         self._advance_initial_context(self.main_client)
-        self._advance_initial_context(self.rollout_client)
 
         self.current_time_seconds = (
             self.start_time_seconds
             + self.config.history_length * self.testcase.step_period_seconds
         )
         self._initialize_histories_from_results(initial_weather_history)
-        return self.get_obs(), {
-            "boptest_current_time_seconds": self.current_time_seconds,
-        }
 
     def _initialize_client(self, client: BaseBoptestClient) -> None:
         client.set_step(self.testcase.step_period_seconds)
@@ -105,7 +84,7 @@ class BoptestEnv(BaseEnv):
     def _advance_initial_context(self, client: BaseBoptestClient) -> None:
         default_inputs = client.control_row_to_inputs(
             self.testcase,
-            self.testcase.default_control_row()
+            self.testcase.default_control_row(),
         )
         for _ in range(self.config.history_length):
             client.advance(default_inputs)
@@ -189,78 +168,6 @@ class BoptestEnv(BaseEnv):
             raise KeyError(f"BOPTEST payload missing point {point_name!r}.")
         return np.asarray(payload[point_name], dtype=np.float64)
 
-    @jaxtyped(typechecker=beartype)
-    def step(
-        self,
-        control_plan: Float[
-            np.ndarray,
-            "{self.config.horizon} {self.config.n_controls}",
-        ],
-    ) -> StepReturn:
-        current_obs = self.get_obs()
-        predicted_states = self._run_shadow_horizon_rollout(control_plan)
-
-        info: dict[str, Any] = {
-            "predicted_states": predicted_states,
-            "applied_control": control_plan[0].copy(),
-            "control_plan": control_plan,
-        }
-
-        reward = self.reward.compute_reward(
-            predicted_states=predicted_states,
-            control_plan=control_plan,
-            weather_forecast=current_obs.weather_forecast,
-            energy_price_forecast=current_obs.energy_price_forecast,
-            current_obs=current_obs,
-            info=info,
-        )
-
-        first_control = control_plan[0].copy()
-        main_values = self.main_client.advance(
-            self._control_row_to_boptest_inputs(first_control)
-        ).values
-
-        self._append_to_histories(
-            next_weather=current_obs.weather_forecast[0].copy(),
-            next_control=first_control,
-            next_state=self._extract_state_from_payload(main_values),
-        )
-
-        self._committed_controls.append(first_control.copy())
-        self.current_time_seconds += self.testcase.step_period_seconds
-        self.elapsed_episode_seconds += self.testcase.step_period_seconds
-
-        truncated = self.elapsed_episode_seconds >= self.config.total_simulation_seconds
-        return self.get_obs(), float(reward), False, truncated, info
-
-    @jaxtyped(typechecker=beartype)
-    def _run_shadow_horizon_rollout(
-        self,
-        control_plan: Float[np.ndarray, "{self.config.horizon} {self.config.n_controls}"],
-    ) -> Float[np.ndarray, "{self.config.horizon} {self.config.n_states}"]:
-        self._sync_rollout_to_current_time()
-
-        states: list[FloatArray] = []
-        for horizon_step in range(self.config.horizon):
-            values = self.rollout_client.advance(
-                self._control_row_to_boptest_inputs(control_plan[horizon_step])
-            ).values
-            states.append(self._extract_state_from_payload(values))
-
-        predicted_states = np.stack(states, axis=0).astype(np.float64)
-        return predicted_states
-
-    def _sync_rollout_to_current_time(self) -> None:
-        if not self._committed_controls:
-            return
-
-        self._initialize_client(self.rollout_client)
-        self._advance_initial_context(self.rollout_client)
-        for committed_control in self._committed_controls:
-            self.rollout_client.advance(
-                self._control_row_to_boptest_inputs(committed_control)
-            )
-
     def _initialize_histories_from_results(
         self,
         initial_weather_history: FloatArray,
@@ -333,22 +240,13 @@ class BoptestEnv(BaseEnv):
         return self.main_client.extract_state_from_values(self.testcase, payload)
 
     def close(self) -> None:
-        main_error: Exception | None = None
-        try:
-            self.main_client.stop()
-        except Exception as exc:
-            main_error = exc
-        finally:
-            self.rollout_client.stop()
+        self.main_client.stop()
 
-        if main_error is not None:
-            raise main_error
-
-    def __enter__(self) -> "BoptestEnv":
+    def __enter__(self) -> "BaseBoptestEnv":
         return self
 
     def __exit__(self, *_exc_info: object) -> None:
         self.close()
 
 
-__all__ = ["BoptestEnv"]
+__all__ = ["BaseBoptestEnv"]

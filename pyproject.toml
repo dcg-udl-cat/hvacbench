@@ -5,9 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "hvacbench"
 version = "0.1.0"
-description = "A Gym-style digital twin environment for RL control of building HVAC systems."
+description = "Environment backends for building HVAC control research."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "pandas>=2.0.0",
     "granite-tsfm @ git+https://github.com/ibm-granite/granite-tsfm.git@v0.3.1",

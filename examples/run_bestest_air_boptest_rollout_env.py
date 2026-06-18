@@ -1,6 +1,6 @@
 from hvacbench.config import EnvConfig
 from hvacbench.energy_price import EnergyPriceType
-from hvacbench.envs.boptest_env import BoptestEnv
+from hvacbench.envs import BoptestRolloutEnv
 from hvacbench.rewards.simple import SimpleReward
 from tqdm import tqdm
 
@@ -12,7 +12,7 @@ def main() -> None:
 
     reward = SimpleReward(config=config)
 
-    env = BoptestEnv(
+    env = BoptestRolloutEnv(
         reward=reward,
         config=config,
         energy_price_type=EnergyPriceType.DYNAMIC,
@@ -22,10 +22,12 @@ def main() -> None:
 
     control_plan = env.get_random_control_plan()
 
-    total_steps = (7 * 24 * 3600) / 15
+    total_steps = config.total_simulation_seconds // config.step_period_seconds
 
     for i in tqdm(range(int(total_steps))):
         obs, reward_value, terminated, truncated, info = env.step(control_plan)
+        if terminated or truncated:
+            break
 
 
 if __name__ == "__main__":

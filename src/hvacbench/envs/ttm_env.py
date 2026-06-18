@@ -1,11 +1,12 @@
 from os import PathLike
+from typing import Any
 
 import numpy as np
 from beartype import beartype
 from jaxtyping import Float, jaxtyped
-from typing import Any, Tuple
 
 from hvacbench.energy_price import EnergyPriceType
+from hvacbench.models import TTM
 from hvacbench.providers import BestestAirCsvProvider
 from hvacbench.schemas import FloatArray, Observation, StepReturn
 from hvacbench.config import EnvConfig, TTMVariables
@@ -25,18 +26,19 @@ class TTMEnv(BaseEnv):
         self,
         config: EnvConfig,
         reward: RewardStrategy,
-        model: BaseTTM,
-        energy_price_type = EnergyPriceType.DYNAMIC,
-        variables = TTMVariables(),
+        model_path: str | PathLike[str] | None = None,
+        energy_price_type: EnergyPriceType = EnergyPriceType.DYNAMIC,
+        variables: TTMVariables = TTMVariables(),
+        model: BaseTTM | None = None,
         provider: BaseProvider | None = None,
         building_data_path: str | PathLike[str] | None = None,
         electricity_price_data_path: str | PathLike[str] | None = None,
         start_day: int = 0,
-    ):
+    ) -> None:
         self.config = config
         self.reward = reward
-        self.model = model
         self.variables = variables
+        self.model = model or self._load_model(model_path)
         self.provider = provider or BestestAirCsvProvider(
             config=config,
             energy_price_type=energy_price_type,
@@ -73,6 +75,15 @@ class TTMEnv(BaseEnv):
 
         self.reset()
 
+    def _load_model(self, model_path: str | PathLike[str] | None) -> BaseTTM:
+        if model_path is None:
+            raise ValueError("TTMEnv requires either model or model_path.")
+        return TTM(
+            config=self.config,
+            model_path=str(model_path),
+            variables=self.variables,
+        )
+
     def _start_timestep_from_day(self, start_day: int) -> int:
         start_seconds = start_day * SECONDS_PER_DAY
         return start_seconds // self.config.step_period_seconds
@@ -100,7 +111,7 @@ class TTMEnv(BaseEnv):
                 f"prediction_length={self.model_prediction_length}."
             )
 
-    def reset(self) -> Tuple[Observation, dict[str, Any]]:
+    def reset(self) -> tuple[Observation, dict[str, Any]]:
         self.current_timestep = 0
         hl = self.history_buffer_length
         self.weather_history = self.provider.get_initial_weather_history(

@@ -224,6 +224,18 @@ def test_start_day_must_be_non_negative():
         )
 
 
+def test_requires_model_or_model_path():
+    config = EnvConfig(history_length=3, horizon=2)
+
+    with pytest.raises(ValueError, match="model or model_path"):
+        TTMEnv(
+            config=config,
+            provider=MockProvider(config),
+            reward=SimpleReward(config),
+            variables=TTMVariables(),
+        )
+
+
 def test_get_random_control_plan_shape(ttm_env, config):
     control_plan = ttm_env.get_random_control_plan()
 

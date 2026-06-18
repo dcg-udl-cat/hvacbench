@@ -6,7 +6,7 @@ import pytest
 from hvacbench.boptest.client import BoptestClient
 from hvacbench.boptest.mock import MockBoptestClient
 from hvacbench.config import EnvConfig
-from hvacbench.envs.boptest_env import BoptestEnv
+from hvacbench.envs import BoptestRolloutEnv
 from hvacbench.rewards.simple import SimpleReward
 
 
@@ -15,10 +15,10 @@ def make_env(
     main_client: MockBoptestClient | None = None,
     rollout_client: MockBoptestClient | None = None,
     start_day: int = 0,
-) -> BoptestEnv:
+) -> BoptestRolloutEnv:
     config = EnvConfig()
     reward = SimpleReward(config)
-    return BoptestEnv(
+    return BoptestRolloutEnv(
         reward=reward,
         config=config,
         main_client=main_client or MockBoptestClient(testid="main"),
@@ -30,7 +30,7 @@ def make_env(
 def test_refuses_clients_with_same_testid() -> None:
     config = EnvConfig()
     with pytest.raises(ValueError, match="different testids"):
-        BoptestEnv(
+        BoptestRolloutEnv(
             reward=SimpleReward(config),
             config=config,
             main_client=MockBoptestClient(testid="same"),
@@ -82,7 +82,7 @@ def test_boptest_start_day_must_be_non_negative() -> None:
     config = EnvConfig()
 
     with pytest.raises(ValueError, match="start_day"):
-        BoptestEnv(
+        BoptestRolloutEnv(
             reward=SimpleReward(config),
             config=config,
             main_client=MockBoptestClient(testid="main"),
@@ -99,14 +99,15 @@ def test_get_random_control_plan_shape() -> None:
 
 
 def test_forecast_conversions_and_request_length() -> None:
-    env = make_env()
+    main_client = MockBoptestClient(testid="main")
+    env = make_env(main_client=main_client)
     obs = env.get_obs()
 
     assert obs.weather_forecast[0, 0] == pytest.approx(10.0)
     assert obs.weather_forecast[0, 1] == pytest.approx(50.0)
     assert obs.energy_price_forecast[0] == pytest.approx(0.10)
-    assert env.main_client.forecast_calls[-2]["horizon_seconds"] == 95 * 900
-    assert env.main_client.forecast_calls[-1]["horizon_seconds"] == 95 * 900
+    assert main_client.forecast_calls[-2]["horizon_seconds"] == 95 * 900
+    assert main_client.forecast_calls[-1]["horizon_seconds"] == 95 * 900
 
 
 def test_step_rollout_sync_commit_first_and_history_updates() -> None:

@@ -5,7 +5,7 @@ from hvacbench.schemas import FloatArray
 
 
 class BoptestTestcase(ABC):
-    """Hardcoded BOPTEST testcase contract used by BoptestEnv."""
+    """Hardcoded BOPTEST testcase contract used by BOPTEST envs."""
 
     name: str
     base_url: str
