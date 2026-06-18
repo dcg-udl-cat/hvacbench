@@ -1,8 +1,12 @@
+from os import PathLike
+
 import numpy as np
 from beartype import beartype
 from jaxtyping import Float, jaxtyped
 from typing import Any, Tuple
 
+from hvacbench.energy_price import EnergyPriceType
+from hvacbench.providers import BestestAirCsvProvider
 from hvacbench.schemas import FloatArray, Observation, StepReturn
 from hvacbench.config import EnvConfig, TTMVariables
 from hvacbench.providers.base import BaseProvider
@@ -20,17 +24,26 @@ class TTMEnv(BaseEnv):
     def __init__(
         self,
         config: EnvConfig,
-        provider: BaseProvider,
         reward: RewardStrategy,
         model: BaseTTM,
-        variables: TTMVariables = TTMVariables(),
+        energy_price_type = EnergyPriceType.DYNAMIC,
+        variables = TTMVariables(),
+        provider: BaseProvider | None = None,
+        building_data_path: str | PathLike[str] | None = None,
+        electricity_price_data_path: str | PathLike[str] | None = None,
         start_day: int = 0,
     ):
         self.config = config
-        self.provider = provider
         self.reward = reward
         self.model = model
         self.variables = variables
+        self.provider = provider or BestestAirCsvProvider(
+            config=config,
+            energy_price_type=energy_price_type,
+            variables=variables,
+            building_data_path=building_data_path,
+            electricity_price_data_path=electricity_price_data_path,
+        )
         self.start_day = int(start_day)
         if self.start_day < 0:
             raise ValueError("start_day must be greater than or equal to 0.")

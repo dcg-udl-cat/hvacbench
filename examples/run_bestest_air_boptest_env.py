@@ -1,4 +1,3 @@
-from hvacbench.boptest.bestest_air import BestestAir
 from hvacbench.config import EnvConfig
 from hvacbench.energy_price import EnergyPriceType
 from hvacbench.envs.boptest_env import BoptestEnv
@@ -11,16 +10,12 @@ def main() -> None:
         history_length=8, horizon=8, total_simulation_seconds=7 * 24 * 3600
     )
 
-    testcase = BestestAir(
-        base_url="http://127.0.0.1",
-        energy_price_type=EnergyPriceType.DYNAMIC
-    )
     reward = SimpleReward(config=config)
 
     env = BoptestEnv(
         reward=reward,
         config=config,
-        testcase=testcase,
+        energy_price_type=EnergyPriceType.DYNAMIC,
     )
 
     obs = env.get_obs()

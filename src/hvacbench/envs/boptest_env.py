@@ -9,6 +9,7 @@ from hvacbench.boptest.bestest_air import BestestAir
 from hvacbench.boptest.client import BoptestClient
 from hvacbench.boptest.testcase import BoptestTestcase
 from hvacbench.config import EnvConfig
+from hvacbench.energy_price import EnergyPriceType
 from hvacbench.envs.base import BaseEnv
 from hvacbench.rewards.base import RewardStrategy
 from hvacbench.schemas import FloatArray, Observation, StepReturn
@@ -26,6 +27,7 @@ class BoptestEnv(BaseEnv):
         self,
         reward: RewardStrategy,
         config: EnvConfig,
+        energy_price_type: EnergyPriceType = EnergyPriceType.DYNAMIC,
         testcase: Optional[BoptestTestcase] = None,
         main_client: Optional[BaseBoptestClient] = None,
         rollout_client: Optional[BaseBoptestClient] = None,
@@ -33,7 +35,7 @@ class BoptestEnv(BaseEnv):
     ) -> None:
         self.config = config
         self.reward = reward
-        self.testcase = testcase or BestestAir()
+        self.testcase = testcase or BestestAir(energy_price_type=energy_price_type)
         self.start_day = int(start_day)
         if self.start_day < 0:
             raise ValueError("start_day must be greater than or equal to 0.")
