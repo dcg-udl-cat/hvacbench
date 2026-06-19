@@ -28,10 +28,9 @@ against a more reliable simulator without changing policy code.
 
 ## Validation workflow
 
-1. Fine-tune or provide a forecasting model that predicts future building
-   states from histories, weather forecasts, and a proposed future control plan.
-2. Train a receding-horizon control policy with `TTMEnv`, which uses that model
-   as the environment dynamics.
+1. Fine-tune or provide a forecasting model that predicts future building states from histories, weather forecasts, and a proposed future control plan. If none is available, we encourage using those in [https://huggingface.co/gft/tm4hvac](htttps://huggingface.co/gft/ttm4hvac) with the `TTMEnv` environment.
+2. Train a receding-horizon control policy with this env, which uses that model
+   as the environment dynamics. By default, the env uses data from the BOPTEST `bestest_air` testcase, which makes it easy to compare the learned surrogate with the BOPTEST reference.
 3. Evaluate the resulting policy with `BoptestRolloutEnv`, where BOPTEST rolls
    out the same proposed control horizon using two synchronized simulator
    clients.
@@ -52,8 +51,7 @@ more credible for control-oriented use.
   committed simulator and one rollout simulator to evaluate the full proposed
   control plan, then commits only the first action.
 - `BoptestEvaluationEnv`: a deployment-style BOPTEST environment. It accepts the
-  same full control plan, applies only the first row, and computes reward from
-  the realized one-step transition.
+  same full control plan but applies only the first row.
 
 All three environments use the same `(horizon, 2)` control-plan contract for
 heating and cooling setpoints in Celsius. By default, the provided TTM data
@@ -151,7 +149,7 @@ uv run python examples/run_bestest_air_boptest_rollout_env.py
 The current implementation provides the TTM path first because TinyTimeMixer is
 a practical foundation time-series model for HVAC dynamics. The architecture is
 kept deliberately small so other forecasting models, BOPTEST testcases, reward
-functions, and future simulator-backed environments such as Sinergym-based
+functions, and simulator backed environments such as Sinergym based
 backends can be added without rewriting controller code.
 
 ## Documentation
@@ -179,7 +177,7 @@ uv build
 
 `hvacbench` is pre-1.0 research software being prepared for public release,
 PyPI packaging, and a SoftwareX submission. Remaining release and manuscript
-tasks are tracked in [PUBLICATION_TODO.md](PUBLICATION_TODO.md).
+tasks are tracked in [PUBLICATION_TODO.md](TODO.md).
 
 ## License
 

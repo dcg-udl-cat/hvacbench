@@ -1,7 +1,7 @@
 # Prompt for Prism OpenAI Agent: Draft the SoftwareX Manuscript
 
 You are writing a SoftwareX "Original software publication" manuscript for the
-Python library `hvacbench`.
+Python library `hvacbench` which resides in `https://github.com/dcg-udl-cat/hvacbench`.
 
 Use the repository as the source of truth. Inspect the code, tests, examples,
 documentation, and `PUBLICATION_TODO.md` before writing. Do not invent results,
@@ -135,6 +135,7 @@ Use real, verified references for:
 - TinyTimeMixer / Granite TSFM.
 - `gft/ttm4hvac` and related TTM4HVAC model/dataset pages.
 - Python package dependencies when relevant.
+- Other frameworks we may need to compare this one to.
 
 Do not fabricate citations. If a reference cannot be verified, leave a TODO.
 
@@ -143,3 +144,65 @@ Do not fabricate citations. If a reference cannot be verified, leave a TODO.
 Produce a complete first manuscript draft, but mark uncertain publication
 metadata with TODO. Keep language precise and suitable for a multidisciplinary
 research-software audience.
+
+## Author's view on the project
+
+Here is how the author describes the project:
+
+Surrogate building models where learning agents can train their control
+policies are expensive and complex to build if physics compoments are
+modeled. Instead, surrogates learned from operation data of buildings are
+easier to get, but not as realiable. Even more, if these are based on deep
+learning models which are black box in nature.
+
+The purpose of this work is to facilitate validation of such surrogate
+models learned from operational data, making it easy to train a policy on
+a gym-like environment that is backed by these models, and then also
+evaluate that policy on environments backed by physics based simulator
+BOPTEST treating it as if it was a real building.
+
+In this project we already implement an environment backed by any
+forecasting model derived from base model TTM (TinyTimeMixer from IBM,
+which is a Foundation Time Series Forecasting model that can forecast
+zero-shot or be easily fine-tunned) as long as it has been fine-tuned to
+forecast rollouts on a horizon. The model is expected to take a history of
+observations plus a future control plan along a given horizon size and
+output the forecasted states of the building if those actions where to be
+applied, then only the first predicted states is kept, creating a
+receding-horizon scenario. This TTMEnv, by default uses data generated
+from the operation of BOPTEST's Bestest Air test case. We also implement a
+BOPTEST backed env which expects the same control plans into the horizon
+and where we have made it possible through two concurrent BOPTEST clients
+to generate rollouts and know the resulting states of applying that
+control plan, then we only commit the first proposed action and create the
+same receding-horizon scenario. This BOPTEST backed backend also uses
+Bestst Air test case by default.
+
+Envs receive a reward object which will define how the reward is computed
+given the proposed control plan and future states that control plan would
+give, the reward object also receives energy price and weather
+observations.
+
+There is also a second BOPTEST backed environment where the control plan
+is not rolled out and only the first action is applied, as if we where
+actually deploying the control policy in a real building where we cannot
+rollout the entire control plan but just commit the first proposed action.
+This environemnt also uses Bestest Air by default.
+
+As provided, the project easily enables a control policy to be trained on
+a data driven learned surrogate which may not trust yet and then see how
+it behaves on a physics based backed env that we do trust and treaet as
+the real building. All of this is done in a reciding-horizon scenario and
+with the purpose of enabling easy validation of data driven learned
+surrogates and rececing-horizon control policies. The second BOPTEST
+backed env extends the set of experiments one can do on this setup. What
+the user is expected to provide is a finetune of a TTM model. For first
+steps we refer to https://huggingface.co/gft/ttm4hvac where there is
+already a collection of finetunes that will work with this project.
+
+The project has been designed with the idea that more envs can be easily
+added, expecting future work to include more simulator backed envs that
+could use Sinergym for example. Also, one can easily do its own fine tune
+of a TTM and use it within this project to easily and quickly validate it
+as valid surrogate model. Other kind of forecasting models other than TTM
+could easily be used and TTM is just the one we alredy provide.

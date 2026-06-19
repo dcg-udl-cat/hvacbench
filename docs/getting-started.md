@@ -41,14 +41,12 @@ from hvacbench.envs import TTMEnv
 from hvacbench.rewards.simple import SimpleReward
 
 config = EnvConfig()
-variables = TTMVariables()
 reward = SimpleReward(config=config)
 
 env = TTMEnv(
     config=config,
     reward=reward,
     model_path="gft/ttm4hvac",
-    variables=variables,
 )
 
 obs, info = env.reset()
