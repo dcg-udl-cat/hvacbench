@@ -4,9 +4,16 @@ You are writing a SoftwareX "Original software publication" manuscript for the
 Python library `hvacbench` which resides in `https://github.com/dcg-udl-cat/hvacbench`.
 
 Use the repository as the source of truth. Inspect the code, tests, examples,
-documentation, and `PUBLICATION_TODO.md` before writing. Do not invent results,
-DOIs, authors, affiliations, funding, or release identifiers. Use TODO markers
-where final publication metadata is missing.
+documentation, `TODO.md`, and the local SoftwareX LaTeX template
+`softwarex-osp-template.tex` before writing. Do not invent results, DOIs,
+authors, affiliations, funding, support emails, or release identifiers. Use TODO
+markers where final publication metadata is missing.
+
+Use `softwarex-osp-template.tex` as the structural authority for the manuscript.
+Create a new manuscript file, for example `softwarex-manuscript.tex`, rather
+than overwriting the template. Preserve the `elsarticle` structure and mandatory
+SoftwareX sections. Delete the template's instructional "Before you begin"
+section from the actual manuscript.
 
 ## Software context
 
@@ -58,33 +65,47 @@ Frame the paper around these points:
 
 ## Required SoftwareX constraints to respect
 
-Follow the current SoftwareX guide for authors:
+Follow the local SoftwareX original software publication template:
 
-- The paper is a short descriptive paper with a 3000-word limit.
-- Use the official SoftwareX original software publication template.
-- Include title page information, abstract, keywords, and highlights.
-- Keep the abstract under 250 words.
-- Prepare 3 to 5 highlights, each no more than 85 characters.
+- Use the `elsarticle` LaTeX structure from `softwarex-osp-template.tex`.
+- The main text has a 4000-word limit and a maximum of 6 pages excluding
+  metadata, tables, figures, and references.
+- Replace the template's instructional `enumerate` block with the five
+  mandatory main-text sections from the template:
+  Motivation and significance, Software description, Illustrative examples,
+  Impact, and Conclusions.
+- Include the mandatory C1-C8 code metadata table exactly as a SoftwareX
+  metadata table, keeping the left-column labels from the template.
+- Include the "Current executable software version" section at the end of the
+  manuscript.
+- Include title page information, abstract, and keywords in the LaTeX front
+  matter.
+- Keep the abstract near the template's requested length of about 100 words.
+- If Elsevier's submission system separately asks for highlights, prepare 3 to
+  5 highlights no more than 85 characters each outside the LaTeX body unless the
+  template is updated to include them.
 - Include funding, competing interests, data availability, and generative-AI
-  declarations as required by Elsevier.
-- Include the SoftwareX software metadata table.
+  declarations as required by Elsevier, using TODO markers when final
+  statements are not known.
 
 ## Sections to draft
 
-Draft these sections in SoftwareX style:
+Draft these sections in SoftwareX style and map them to the LaTeX template:
 
 1. **Metadata table**
    - Current code version: TODO
    - Permanent link to code/repository: https://github.com/dcg-udl-cat/hvacbench
-   - Permanent link to reproducible capsule: TODO if any
    - Legal code license: MIT
    - Code versioning system: git
    - Software code languages, tools, and services: Python, uv, BOPTEST,
      TinyTimeMixer, command-line interface
    - Compilation requirements, operating environments, and dependencies: derive
      from `pyproject.toml`
-   - If available, link to developer documentation/manual: GitHub Pages URL TODO
+   - If available, link to developer documentation/manual:
+     https://dcg-udl-cat.github.io/hvacbench/
    - Support email: TODO
+   - Keep the C1-C8 rows from `softwarex-osp-template.tex`; do not add extra
+     rows unless the template is updated.
 
 2. **Motivation and significance**
    - Explain why learned building surrogates from operational data are useful
@@ -144,6 +165,18 @@ Draft these sections in SoftwareX style:
    - Data availability: packaged CSV data and repository URL; clarify any
      external BOPTEST/model requirements.
    - Generative AI declaration: TODO based on actual writing workflow.
+   - The local template does not provide a dedicated declarations block. If
+     these statements are required for submission, place them near
+     Acknowledgements or immediately before References, and keep TODO markers
+     for unknown final statements.
+
+8. **Current executable software version**
+   - Fill the template's final "Current executable software version" section.
+   - Include executable/package name: `hvacbench`.
+   - Include version: TODO until final release tag is created.
+   - Include source code repository: https://github.com/dcg-udl-cat/hvacbench
+   - Include license: MIT.
+   - Include installation/execution notes from README and CLI docs.
 
 ## References and sources to verify
 
@@ -161,9 +194,11 @@ Do not fabricate citations. If a reference cannot be verified, leave a TODO.
 
 ## Output requirements
 
-Produce a complete first manuscript draft, but mark uncertain publication
-metadata with TODO. Keep language precise and suitable for a multidisciplinary
-research-software audience.
+Produce a complete first LaTeX manuscript draft compatible with
+`softwarex-osp-template.tex`, but mark uncertain publication metadata with TODO.
+Keep language precise and suitable for a multidisciplinary research-software
+audience. Do not include the template's instructional boilerplate in the final
+manuscript.
 
 ## Author's project framing
 
