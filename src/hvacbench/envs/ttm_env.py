@@ -20,7 +20,7 @@ SECONDS_PER_DAY = 24 * 60 * 60
 
 
 class TTMEnv(BaseEnv):
-    """Environment backed by a forecasting model / digital twin."""
+    """Environment backed by a learned forecasting surrogate."""
 
     def __init__(
         self,

@@ -33,7 +33,7 @@ The mock example does not require a BOPTEST server or a trained TinyTimeMixer
 checkpoint. It uses deterministic mock provider and model implementations to
 exercise the environment loop.
 
-## Minimal TTM environment
+## Minimal learned-surrogate environment
 
 ```python
 from hvacbench.config import EnvConfig, TTMVariables
@@ -55,6 +55,11 @@ obs, info = env.reset()
 control_plan = env.get_random_control_plan()
 next_obs, reward_value, terminated, truncated, step_info = env.step(control_plan)
 ```
+
+The default example uses
+[`gft/ttm4hvac`](https://huggingface.co/gft/ttm4hvac), a TinyTimeMixer HVAC
+fine-tune published on Hugging Face. You can also use your own fine-tuned TTM
+checkpoint, or pass a custom model object implementing `BaseTTM`.
 
 ## Minimal BOPTEST rollout environment
 
@@ -78,3 +83,7 @@ env = BoptestRolloutEnv(
 two simultaneous `bestest_air` testcase instances. By default it creates the
 packaged `BestestAir` testcase mapping; pass `testcase=...` to use another
 `BoptestTestcase` implementation.
+
+Use `BoptestEvaluationEnv` for deployment-style evaluation: it accepts the same
+control plan shape, applies only the first action, and computes reward from the
+realized one-step transition.

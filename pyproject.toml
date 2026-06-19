@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hvacbench"
 version = "0.1.0"
-description = "Environment backends for building HVAC control research."
+description = "Receding-horizon environments for validating learned HVAC surrogates."
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 license = "MIT"
@@ -16,7 +16,7 @@ authors = [
 keywords = [
     "building control",
     "boptest",
-    "digital twins",
+    "surrogate models",
     "hvac",
     "reinforcement learning",
 ]

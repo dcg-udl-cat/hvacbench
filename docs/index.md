@@ -1,35 +1,52 @@
 # hvacbench
 
-`hvacbench` is a Python library for comparing building HVAC control backends
-through a shared receding-horizon environment API. It is designed for research
-workflows where a controller may be trained with a learned digital twin and then
-evaluated against a physics-based backend such as BOPTEST.
+`hvacbench` is a Python library for validating data-driven building surrogate
+models in receding-horizon HVAC control workflows. It makes it straightforward
+to train a policy in an environment backed by a learned forecasting model and
+then evaluate the same policy in BOPTEST-backed environments treated as trusted
+physics-based references.
 
 ## Why it exists
 
-Building control papers often couple a policy, a simulator, a dataset, and a
-reward into one experiment script. That makes it hard to compare whether a
-result comes from the controller itself or from the backend used to score it.
-`hvacbench` separates these concerns:
+Physics-based building models are costly to construct when detailed thermal,
+HVAC, and control components must be represented. Learned surrogates built from
+operation data are easier to obtain, but they can be unreliable, particularly
+when the model is a black-box deep learning forecaster. `hvacbench` focuses on
+that gap:
 
-- environments expose the same observation and control-plan contract;
+- `TTMEnv` turns a fine-tuned forecasting model into a control-training
+  environment;
+- BOPTEST-backed environments expose the same policy-facing contract;
+- policies can be moved from learned surrogate training to physics-based
+  evaluation;
+- rewards receive the proposed controls, future states, weather, and energy
+  prices;
 - providers supply histories, weather forecasts, and price forecasts;
-- models predict state trajectories for learned-digital-twin rollouts;
-- rewards score comfort, cost, and control regularity over a horizon.
+- the receding-horizon semantics are explicit and shared.
 
 ## Current backends
 
-- `TTMEnv`: learned digital-twin backend using TinyTimeMixer-compatible models.
-- `BoptestRolloutEnv`: two-simulator BOPTEST backend for horizon rollout scoring.
+- `TTMEnv`: learned-surrogate backend using TinyTimeMixer-compatible models.
+- `BoptestRolloutEnv`: two-simulator BOPTEST backend for horizon rollout
+  evaluation.
 - `BoptestEvaluationEnv`: single-simulator BOPTEST backend for realized policy
   evaluation.
 
-The current BOPTEST mapping targets the `bestest_air` testcase. The public
-interfaces are intentionally small so that additional buildings, providers,
-models, and reward functions can be added without changing controller code.
+The current concrete mapping targets the BOPTEST `bestest_air` testcase. That
+specific implementation is also the first validation target for TTM4HVAC-style
+surrogates. The interfaces are intentionally small so that additional
+forecasting models, BOPTEST testcases, reward functions, and future
+simulator-backed environments can be added without changing controller code.
+
+## TTM4HVAC starting point
+
+The default model examples use
+[`gft/ttm4hvac`](https://huggingface.co/gft/ttm4hvac), a Hugging Face repository
+for TinyTimeMixer HVAC dynamics modeling. The project can also use custom
+fine-tunes or other forecasting models adapted to the `BaseTTM` interface.
 
 ## Project status
 
 `hvacbench` is research software prepared for open-source publication and a
 SoftwareX submission. The package is currently pre-1.0 and the public API may
-change while the benchmark interface matures.
+change while the surrogate-validation workflow matures.

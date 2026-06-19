@@ -1,7 +1,8 @@
 # SoftwareX readiness
 
 `hvacbench` is being prepared for submission to SoftwareX as reusable research
-software for building HVAC control experiments.
+software for validating learned HVAC surrogate models in receding-horizon
+control workflows.
 
 ## Repository requirements
 
@@ -16,6 +17,14 @@ This repository is therefore prepared with:
 - automated test and documentation workflows;
 - examples and unit tests;
 - a publication TODO checklist.
+
+## Contribution to emphasize
+
+The manuscript should frame `hvacbench` as a validation harness for
+operation-data-driven building surrogates. The central contribution is not only
+that multiple backends exist, but that the same receding-horizon policy can be
+trained on a learned forecasting model and then evaluated against BOPTEST
+environments treated as trusted physics-based references.
 
 ## Manuscript requirements to complete later
 

@@ -6,45 +6,66 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-2ea44f.svg)](https://dcg-udl-cat.github.io/hvacbench/)
 
-Backend-agnostic environments for building HVAC control research.
+Receding-horizon environments for validating learned HVAC surrogate models.
 
-`hvacbench` provides a shared receding-horizon environment API for comparing
-HVAC control backends. It is designed for workflows where a policy may be
-trained with a learned digital twin and evaluated against a physics-based
-BOPTEST backend without changing the policy-facing observation and action
-contract.
+`hvacbench` helps evaluate whether data-driven building surrogates are useful
+for training HVAC control policies. The core workflow is to train a policy in a
+Gym-like environment backed by a learned forecasting model, then evaluate the
+same policy in BOPTEST-backed environments that act as trusted physics-based
+references for the building.
 
-## Why hvacbench?
+## Purpose
 
-Building control experiments often bind together controller code, forecast
-data, simulator access, reward logic, and evaluation protocol. `hvacbench`
-separates those concerns into reusable pieces:
+High-fidelity physics models for HVAC control are expensive to build and
+maintain. Surrogates learned from building operation data are easier to obtain,
+but they are harder to trust, especially when they are based on black-box deep
+learning forecasters.
 
-- environments expose a consistent control-plan API;
-- providers supply histories, weather forecasts, and electricity prices;
-- model wrappers evaluate learned digital twins;
-- BOPTEST clients evaluate physics-backed rollouts and realized policy steps;
-- reward strategies score comfort, energy cost, and control smoothness.
+`hvacbench` is built around that validation problem. It gives learned
+surrogates and physics-based BOPTEST simulations the same receding-horizon
+control interface, so a controller trained on a data-driven model can be tested
+against a more reliable simulator without changing policy code.
 
-The current implementation includes a TinyTimeMixer-compatible backend, a
-`bestest_air` BOPTEST mapping, mock backends for tests, packaged CSV data
-providers, safety filtering, examples, documentation, and CI workflows.
+## Validation workflow
 
-## Environment contract
+1. Fine-tune or provide a forecasting model that predicts future building
+   states from histories, weather forecasts, and a proposed future control plan.
+2. Train a receding-horizon control policy with `TTMEnv`, which uses that model
+   as the environment dynamics.
+3. Evaluate the resulting policy with `BoptestRolloutEnv`, where BOPTEST rolls
+   out the same proposed control horizon using two synchronized simulator
+   clients.
+4. Evaluate deployment-like behavior with `BoptestEvaluationEnv`, where only the
+   first proposed action is applied, as would happen on a real building.
 
-At every step, a controller receives past histories and future forecasts, then
-submits a full `(horizon, 2)` control plan with heating and cooling setpoints in
-Celsius. Each backend evaluates the plan according to its semantics and commits
-only the first control row before the environment moves forward by one 15-minute
-timestep.
+This setup makes the learned surrogate itself easier to validate: if policies
+trained on it transfer well to the BOPTEST-backed environments, the surrogate is
+more credible for control-oriented use.
 
-The three main environments are:
+## Implemented environments
 
-- `TTMEnv`: learned digital-twin backend using TinyTimeMixer-compatible models.
-- `BoptestRolloutEnv`: BOPTEST-backed horizon rollout backend with committed and
-  rollout simulators.
-- `BoptestEvaluationEnv`: single-simulator BOPTEST backend for realized policy
-  evaluation.
+- `TTMEnv`: a learned-surrogate environment for TinyTimeMixer-compatible
+  forecasting models. The model receives histories and a future control plan,
+  predicts future states over the horizon, and the environment commits only the
+  first predicted transition.
+- `BoptestRolloutEnv`: a BOPTEST-backed horizon rollout environment. It uses one
+  committed simulator and one rollout simulator to evaluate the full proposed
+  control plan, then commits only the first action.
+- `BoptestEvaluationEnv`: a deployment-style BOPTEST environment. It accepts the
+  same full control plan, applies only the first row, and computes reward from
+  the realized one-step transition.
+
+All three environments use the same `(horizon, 2)` control-plan contract for
+heating and cooling setpoints in Celsius. By default, the provided TTM data
+provider and BOPTEST mappings target the BOPTEST `bestest_air` testcase.
+
+## Rewards
+
+Environments receive a reward object implementing `RewardStrategy`. A reward is
+computed from the proposed control plan, forecasted or realized future states,
+weather observations, and energy-price forecasts. The packaged `SimpleReward`
+combines comfort, energy cost, and setpoint smoothness terms, but experiments can
+provide their own reward strategy.
 
 ## Installation
 
@@ -68,7 +89,7 @@ server:
 uv run python examples/run_mock_env.py
 ```
 
-Minimal learned-digital-twin environment:
+Minimal learned-surrogate environment:
 
 ```python
 from hvacbench.config import EnvConfig, TTMVariables
@@ -76,14 +97,12 @@ from hvacbench.envs import TTMEnv
 from hvacbench.rewards.simple import SimpleReward
 
 config = EnvConfig()
-variables = TTMVariables()
 reward = SimpleReward(config=config)
 
 env = TTMEnv(
     config=config,
     reward=reward,
     model_path="gft/ttm4hvac",
-    variables=variables,
 )
 
 obs, info = env.reset()
@@ -91,14 +110,15 @@ control_plan = env.get_random_control_plan()
 next_obs, reward_value, terminated, truncated, step_info = env.step(control_plan)
 ```
 
-For tests or custom integrations, pass an object implementing `BaseTTM` through
-the `model` argument instead of passing `model_path`.
+The current first-step model path is the
+[`gft/ttm4hvac`](https://huggingface.co/gft/ttm4hvac) Hugging Face repository,
+which hosts a TinyTimeMixer HVAC fine-tune and related datasets/models. You can
+also pass a custom object implementing `BaseTTM` through the `model` argument.
 
-## BOPTEST backends
+## BOPTEST evaluation
 
-`BoptestRolloutEnv` and `BoptestEvaluationEnv` use the same full-horizon action
-shape as `TTMEnv`. By default, they instantiate the packaged `BestestAir`
-testcase mapping. You can also pass a custom `BoptestTestcase` implementation.
+`BoptestRolloutEnv` and `BoptestEvaluationEnv` use `BestestAir` by default. You
+can also pass another `BoptestTestcase` implementation.
 
 ```python
 from hvacbench.config import EnvConfig
@@ -118,18 +138,21 @@ env = BoptestRolloutEnv(
 ```
 
 `BoptestRolloutEnv` requires a running BOPTEST service with enough workers for
-two simultaneous `bestest_air` testcase instances. Use it when a controller
-needs BOPTEST-backed horizon rollout scores.
-
-`BoptestEvaluationEnv` uses one BOPTEST simulator, applies only the first
-control row, and computes reward from the realized one-step transition. Use it
-for final realized policy evaluation.
+two simultaneous `bestest_air` testcase instances.
 
 Run a live rollout smoke test with:
 
 ```bash
 uv run python examples/run_bestest_air_boptest_rollout_env.py
 ```
+
+## Extensibility
+
+The current implementation provides the TTM path first because TinyTimeMixer is
+a practical foundation time-series model for HVAC dynamics. The architecture is
+kept deliberately small so other forecasting models, BOPTEST testcases, reward
+functions, and future simulator-backed environments such as Sinergym-based
+backends can be added without rewriting controller code.
 
 ## Documentation
 
