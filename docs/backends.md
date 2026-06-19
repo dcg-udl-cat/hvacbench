@@ -21,6 +21,13 @@ The environment may keep a longer internal history buffer than the observation
 window if the model context length is larger than `EnvConfig.history_length`.
 The packaged default provider uses BOPTEST `bestest_air` operation data.
 
+From the CLI, select the TTM checkpoint or Hugging Face model id with
+`--model-path`:
+
+```bash
+uv run hvacbench ttm-rollout --model-path gft/ttm4hvac
+```
+
 ## BoptestRolloutEnv
 
 `BoptestRolloutEnv` is the physics-based counterpart to `TTMEnv`. It accepts the
@@ -53,7 +60,8 @@ can be committed before observing the next state.
 - BOPTEST setpoint inputs are sent in Kelvin.
 - Room air temperature is converted from Kelvin to Celsius.
 - HVAC power is approximated as cooling power plus fan power plus heating power.
-- Electricity price point selection follows `EnergyPriceType`.
+- Electricity price point selection follows `EnergyPriceType`: `constant`,
+  `dynamic`, or `highly_dynamic`.
 
 ## Future backend paths
 

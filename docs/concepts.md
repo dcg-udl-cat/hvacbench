@@ -60,6 +60,22 @@ Providers implement `BaseProvider` and are responsible for:
 `BestestAirCsvProvider` uses packaged cyclic CSV data generated from BOPTEST
 `bestest_air` operation for offline tests and model-backed rollouts.
 
+## Energy price scenarios
+
+`EnergyPriceType` controls which electricity-price profile is exposed in the
+observation and passed to rewards:
+
+- `CONSTANT`: a flat price signal.
+- `DYNAMIC`: a day/night tariff profile and the default setting.
+- `HIGHLY_DYNAMIC`: a more variable spot-price-like profile.
+
+In `TTMEnv`, `BestestAirCsvProvider` selects the corresponding column from the
+packaged electricity-price CSV. In BOPTEST-backed environments, the same enum is
+mapped to the testcase scenario and forecast point used by `bestest_air`. The
+environment dynamics do not directly consume prices; prices are available to
+the policy through observations and to the reward through
+`energy_price_forecast`.
+
 ## Rewards
 
 Rewards implement `RewardStrategy`. `SimpleReward` combines:

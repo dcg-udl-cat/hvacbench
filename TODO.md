@@ -12,3 +12,5 @@ Tasks to complete before SoftwareX submission and public release.
       installation path if needed.
 - [ ] Publish the package to PyPI.
 - [ ] Add a PyPI badge after the package is public.
+- [ ] Record asciinema with cli.
+- [ ] Style a bit the repo, with a logo, a banner, and a favicon and the asciinema recording.

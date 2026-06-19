@@ -28,9 +28,14 @@ against a more reliable simulator without changing policy code.
 
 ## Validation workflow
 
-1. Fine-tune or provide a forecasting model that predicts future building states from histories, weather forecasts, and a proposed future control plan. If none is available, we encourage using those in [https://huggingface.co/gft/tm4hvac](htttps://huggingface.co/gft/ttm4hvac) with the `TTMEnv` environment.
-2. Train a receding-horizon control policy with this env, which uses that model
-   as the environment dynamics. By default, the env uses data from the BOPTEST `bestest_air` testcase, which makes it easy to compare the learned surrogate with the BOPTEST reference.
+1. Fine-tune or provide a forecasting model that predicts future building
+   states from histories, weather forecasts, and a proposed future control plan.
+   If none is available, start with
+   [`gft/ttm4hvac`](https://huggingface.co/gft/ttm4hvac) and `TTMEnv`.
+2. Train a receding-horizon control policy with this environment, which uses the
+   model as the environment dynamics. By default, the environment uses data from
+   the BOPTEST `bestest_air` testcase, which makes it easy to compare the
+   learned surrogate with the BOPTEST reference.
 3. Evaluate the resulting policy with `BoptestRolloutEnv`, where BOPTEST rolls
    out the same proposed control horizon using two synchronized simulator
    clients.
@@ -87,10 +92,44 @@ server:
 uv run python examples/run_mock_env.py
 ```
 
+You can also run the same kind of offline smoke test through the CLI:
+
+```bash
+uv run hvacbench info
+uv run hvacbench mock-rollout --steps 5 --history-length 8 --horizon 8
+```
+
+The CLI is intended for quick local demos and asciinema recordings. It can also
+run a real TTM-backed surrogate rollout where the model is selected with
+`--model-path`:
+
+```bash
+uv run hvacbench ttm-rollout \
+  --model-path gft/ttm4hvac \
+  --steps 3 \
+  --history-length 8 \
+  --horizon 8 \
+  --energy-price dynamic
+```
+
+The same `--energy-price` option is available for TTM and BOPTEST commands. It
+selects one of the packaged electricity-price profiles: `constant`, `dynamic`,
+or `highly_dynamic`.
+
+The CLI also includes live BOPTEST commands:
+
+```bash
+uv run hvacbench boptest-rollout --steps 3 --history-length 8 --horizon 8
+uv run hvacbench boptest-evaluate --steps 3 --history-length 8 --horizon 8
+```
+
+Those BOPTEST commands require a running BOPTEST service. See the
+[CLI docs](docs/cli.md) for the full set of options.
+
 Minimal learned-surrogate environment:
 
 ```python
-from hvacbench.config import EnvConfig, TTMVariables
+from hvacbench.config import EnvConfig
 from hvacbench.envs import TTMEnv
 from hvacbench.rewards.simple import SimpleReward
 
@@ -116,7 +155,12 @@ also pass a custom object implementing `BaseTTM` through the `model` argument.
 ## BOPTEST evaluation
 
 `BoptestRolloutEnv` and `BoptestEvaluationEnv` use `BestestAir` by default. You
-can also pass another `BoptestTestcase` implementation.
+can also pass another `BoptestTestcase` implementation. `EnergyPriceType`
+selects the electricity-price profile used by the reward:
+
+- `CONSTANT`: a flat electricity price.
+- `DYNAMIC`: the day/night tariff profile used by default.
+- `HIGHLY_DYNAMIC`: a more variable spot-price-like profile.
 
 ```python
 from hvacbench.config import EnvConfig
@@ -149,7 +193,7 @@ uv run python examples/run_bestest_air_boptest_rollout_env.py
 The current implementation provides the TTM path first because TinyTimeMixer is
 a practical foundation time-series model for HVAC dynamics. The architecture is
 kept deliberately small so other forecasting models, BOPTEST testcases, reward
-functions, and simulator backed environments such as Sinergym based
+functions, and simulator-backed environments such as Sinergym-based
 backends can be added without rewriting controller code.
 
 ## Documentation
@@ -177,7 +221,7 @@ uv build
 
 `hvacbench` is pre-1.0 research software being prepared for public release,
 PyPI packaging, and a SoftwareX submission. Remaining release and manuscript
-tasks are tracked in [PUBLICATION_TODO.md](TODO.md).
+tasks are tracked in [PUBLICATION_TODO.md](PUBLICATION_TODO.md).
 
 ## License
 

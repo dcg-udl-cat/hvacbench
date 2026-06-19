@@ -33,10 +33,37 @@ The mock example does not require a BOPTEST server or a trained TinyTimeMixer
 checkpoint. It uses deterministic mock provider and model implementations to
 exercise the environment loop.
 
+## Run the CLI
+
+The package installs a `hvacbench` command for demos and smoke tests. From a
+source checkout, run it through `uv`:
+
+```bash
+uv run hvacbench info
+uv run hvacbench mock-rollout --steps 5 --history-length 8 --horizon 8
+```
+
+The mock rollout command is suitable for asciinema recordings because it does
+not require a trained model checkpoint or BOPTEST service.
+
+Use `ttm-rollout` when you want the CLI to load a real TTM-compatible model:
+
+```bash
+uv run hvacbench ttm-rollout \
+  --model-path gft/ttm4hvac \
+  --steps 3 \
+  --history-length 8 \
+  --horizon 8 \
+  --energy-price dynamic
+```
+
+The `--model-path` value can be a Hugging Face model id or a local directory.
+The `--energy-price` value can be `constant`, `dynamic`, or `highly_dynamic`.
+
 ## Minimal learned-surrogate environment
 
 ```python
-from hvacbench.config import EnvConfig, TTMVariables
+from hvacbench.config import EnvConfig
 from hvacbench.envs import TTMEnv
 from hvacbench.rewards.simple import SimpleReward
 

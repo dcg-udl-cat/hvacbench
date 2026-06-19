@@ -29,8 +29,9 @@ often black-box deep learning models. `hvacbench` enables a user to train a
 policy on such a surrogate, then evaluate whether the policy behaves well on
 BOPTEST-backed environments that act as the reference building. The current
 implementation includes a `bestest_air` BOPTEST mapping, packaged CSV data
-providers derived from BOPTEST operation, a simple reward, safety filtering,
-mock backends for tests, and examples.
+providers derived from BOPTEST operation, configurable electricity-price
+scenarios, a simple reward, safety filtering, mock backends for tests, examples,
+and a CLI for smoke tests and terminal demos.
 
 ## Manuscript positioning
 
@@ -50,6 +51,10 @@ Frame the paper around these points:
 6. The current implementation targets BOPTEST `bestest_air`, but the structure
    supports additional simulator-backed environments, BOPTEST testcases, reward
    functions, and forecasting models.
+7. The package includes a command-line interface that can run offline mock
+   rollouts, real TTM-backed rollouts with user-selected model paths, and live
+   BOPTEST smoke tests, supporting asciinema demonstrations and quick
+   reproducibility checks.
 
 ## Required SoftwareX constraints to respect
 
@@ -74,7 +79,8 @@ Draft these sections in SoftwareX style:
    - Permanent link to reproducible capsule: TODO if any
    - Legal code license: MIT
    - Code versioning system: git
-   - Software code languages, tools, and services: Python, uv, BOPTEST, TinyTimeMixer
+   - Software code languages, tools, and services: Python, uv, BOPTEST,
+     TinyTimeMixer, command-line interface
    - Compilation requirements, operating environments, and dependencies: derive
      from `pyproject.toml`
    - If available, link to developer documentation/manual: GitHub Pages URL TODO
@@ -100,9 +106,23 @@ Draft these sections in SoftwareX style:
      deployment in a real building where future rollouts cannot be queried.
    - Explain that reward objects receive future states, control plans, weather,
      energy prices, and current observations.
+   - Explain `EnergyPriceType`: `constant`, `dynamic`, and `highly_dynamic`
+     profiles are exposed to observations and rewards; the enum selects packaged
+     CSV price columns for `TTMEnv` and BOPTEST scenario price signals for
+     BOPTEST-backed environments.
+   - Explain that the CLI exposes `info`, `mock-rollout`, `ttm-rollout`,
+     `boptest-rollout`, and `boptest-evaluate` commands for demonstrations and
+     smoke tests. `ttm-rollout --model-path ...` lets users choose the
+     TinyTimeMixer-compatible checkpoint or Hugging Face model id.
 
 4. **Illustrative examples**
-   - Use examples from `examples/` and tests.
+   - Use examples from `examples/`, tests, and the CLI documentation.
+   - Include a short terminal-style example based on
+     `hvacbench mock-rollout --steps 5 --history-length 8 --horizon 8`; this is
+     suitable for an asciinema recording because it has no external service
+     dependency.
+   - Include a second CLI example showing model selection:
+     `hvacbench ttm-rollout --model-path gft/ttm4hvac --energy-price dynamic`.
    - Do not claim performance results unless they are present in the repository.
 
 5. **Impact**
@@ -145,64 +165,52 @@ Produce a complete first manuscript draft, but mark uncertain publication
 metadata with TODO. Keep language precise and suitable for a multidisciplinary
 research-software audience.
 
-## Author's view on the project
+## Author's project framing
 
-Here is how the author describes the project:
+Use this framing when drafting the manuscript:
 
-Surrogate building models where learning agents can train their control
-policies are expensive and complex to build if physics compoments are
-modeled. Instead, surrogates learned from operation data of buildings are
-easier to get, but not as realiable. Even more, if these are based on deep
-learning models which are black box in nature.
+Physics-based building models for control-policy training are expensive and
+complex to construct when detailed building, thermal, and HVAC components must
+be modeled. Data-driven surrogates learned from building operation data are
+easier to obtain, but they are less reliable and harder to trust, especially
+when the surrogate is a black-box deep learning forecaster.
 
-The purpose of this work is to facilitate validation of such surrogate
-models learned from operational data, making it easy to train a policy on
-a gym-like environment that is backed by these models, and then also
-evaluate that policy on environments backed by physics based simulator
-BOPTEST treating it as if it was a real building.
+The purpose of `hvacbench` is to facilitate validation of those learned
+surrogates. A user can train a policy in a Gym-like environment backed by a
+forecasting model, then evaluate the same policy in BOPTEST-backed environments
+treated as a trusted physics-based proxy for the real building.
 
-In this project we already implement an environment backed by any
-forecasting model derived from base model TTM (TinyTimeMixer from IBM,
-which is a Foundation Time Series Forecasting model that can forecast
-zero-shot or be easily fine-tunned) as long as it has been fine-tuned to
-forecast rollouts on a horizon. The model is expected to take a history of
-observations plus a future control plan along a given horizon size and
-output the forecasted states of the building if those actions where to be
-applied, then only the first predicted states is kept, creating a
-receding-horizon scenario. This TTMEnv, by default uses data generated
-from the operation of BOPTEST's Bestest Air test case. We also implement a
-BOPTEST backed env which expects the same control plans into the horizon
-and where we have made it possible through two concurrent BOPTEST clients
-to generate rollouts and know the resulting states of applying that
-control plan, then we only commit the first proposed action and create the
-same receding-horizon scenario. This BOPTEST backed backend also uses
-Bestst Air test case by default.
+The implemented learned-surrogate path is `TTMEnv`. It supports forecasting
+models compatible with the `BaseTTM` interface, including TinyTimeMixer
+fine-tunes. The model receives histories plus a future control plan and outputs
+forecasted building states over the horizon. `TTMEnv` scores the horizon but
+commits only the first predicted transition, creating a receding-horizon
+scenario. By default, the packaged data provider uses data generated from
+BOPTEST `bestest_air` operation. The CLI command
+`hvacbench ttm-rollout --model-path ...` should be described as the practical
+way to select a TTM fine-tune for a terminal demonstration.
 
-Envs receive a reward object which will define how the reward is computed
-given the proposed control plan and future states that control plan would
-give, the reward object also receives energy price and weather
-observations.
+The BOPTEST rollout path is `BoptestRolloutEnv`. It expects the same
+full-horizon control plans and uses two concurrent BOPTEST clients: one for the
+committed simulator and one for horizon rollouts. After scoring the proposed
+plan, only the first action is committed, matching the same receding-horizon
+semantics as `TTMEnv`.
 
-There is also a second BOPTEST backed environment where the control plan
-is not rolled out and only the first action is applied, as if we where
-actually deploying the control policy in a real building where we cannot
-rollout the entire control plan but just commit the first proposed action.
-This environemnt also uses Bestest Air by default.
+The deployment-style path is `BoptestEvaluationEnv`. It accepts the same
+control plan shape but does not roll out the horizon. It applies only the first
+action and computes reward from the realized one-step transition, matching the
+case where a controller is deployed on a building and cannot query future
+rollouts.
 
-As provided, the project easily enables a control policy to be trained on
-a data driven learned surrogate which may not trust yet and then see how
-it behaves on a physics based backed env that we do trust and treaet as
-the real building. All of this is done in a reciding-horizon scenario and
-with the purpose of enabling easy validation of data driven learned
-surrogates and rececing-horizon control policies. The second BOPTEST
-backed env extends the set of experiments one can do on this setup. What
-the user is expected to provide is a finetune of a TTM model. For first
-steps we refer to https://huggingface.co/gft/ttm4hvac where there is
-already a collection of finetunes that will work with this project.
+Rewards are supplied by the user. A reward object receives the proposed control
+plan, forecasted or realized future states, weather observations, energy-price
+forecasts, the current observation, and diagnostic information.
 
-The project has been designed with the idea that more envs can be easily
-added, expecting future work to include more simulator backed envs that
-could use Sinergym for example. Also, one can easily do its own fine tune
-of a TTM and use it within this project to easily and quickly validate it
-as valid surrogate model. Other kind of forecasting models other than TTM
-could easily be used and TTM is just the one we alredy provide.
+Electricity prices are represented with `EnergyPriceType`. The available modes
+are `constant`, `dynamic`, and `highly_dynamic`. These modes let examples and
+experiments change the reward signal without changing the environment contract.
+
+For first steps, refer users to https://huggingface.co/gft/ttm4hvac. Users may
+also fine-tune their own TTM model or adapt another forecasting model to the
+`BaseTTM` interface. Future work can add more BOPTEST testcases and additional
+simulator-backed environments, including Sinergym-like backends.

@@ -24,6 +24,14 @@ that gap:
 - providers supply histories, weather forecasts, and price forecasts;
 - the receding-horizon semantics are explicit and shared.
 
+The package also includes a CLI for quick smoke tests and terminal
+demonstrations:
+
+```bash
+uv run hvacbench mock-rollout --steps 5 --history-length 8 --horizon 8
+uv run hvacbench ttm-rollout --model-path gft/ttm4hvac --energy-price dynamic
+```
+
 ## Current backends
 
 - `TTMEnv`: learned-surrogate backend using TinyTimeMixer-compatible models.

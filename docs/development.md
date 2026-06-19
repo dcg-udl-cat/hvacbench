@@ -19,6 +19,17 @@ uv build
 Remove generated `dist/` files before committing unless preparing an actual
 release artifact.
 
+## CLI smoke test
+
+The package exposes a console script:
+
+```bash
+uv run hvacbench info
+uv run hvacbench mock-rollout --steps 2 --history-length 4 --horizon 4
+```
+
+Keep CLI output stable enough for documentation and asciinema demos.
+
 ## Repository layout
 
 ```text

@@ -1,5 +1,5 @@
 site_name: hvacbench
-site_description: Environment backends for building HVAC control research.
+site_description: Receding-horizon environments for validating learned HVAC surrogates.
 site_url: https://dcg-udl-cat.github.io/hvacbench/
 repo_url: https://github.com/dcg-udl-cat/hvacbench
 repo_name: dcg-udl-cat/hvacbench
@@ -32,10 +32,10 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Concepts: concepts.md
+  - CLI: cli.md
   - Backends: backends.md
   - API reference: api.md
   - Development: development.md
-  - SoftwareX readiness: softwarex.md
 
 plugins:
   - search

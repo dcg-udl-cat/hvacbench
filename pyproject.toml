@@ -62,6 +62,9 @@ Documentation = "https://dcg-udl-cat.github.io/hvacbench/"
 Repository = "https://github.com/dcg-udl-cat/hvacbench"
 Issues = "https://github.com/dcg-udl-cat/hvacbench/issues"
 
+[project.scripts]
+hvacbench = "hvacbench.cli:main"
+
 [tool.ruff]
 line-length = 88
 target-version = "py313"
