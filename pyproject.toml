@@ -8,6 +8,28 @@ version = "0.1.0"
 description = "Environment backends for building HVAC control research."
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+authors = [
+    { name = "hvacbench contributors" },
+]
+keywords = [
+    "building control",
+    "boptest",
+    "digital twins",
+    "hvac",
+    "reinforcement learning",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
     "pandas>=2.0.0",
     "granite-tsfm @ git+https://github.com/ibm-granite/granite-tsfm.git@v0.3.1",
@@ -27,6 +49,18 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.8.0",
 ]
+
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.27.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/dcg-udl-cat/hvacbench"
+Documentation = "https://dcg-udl-cat.github.io/hvacbench/"
+Repository = "https://github.com/dcg-udl-cat/hvacbench"
+Issues = "https://github.com/dcg-udl-cat/hvacbench/issues"
 
 [tool.ruff]
 line-length = 88
@@ -49,6 +83,9 @@ allow-direct-references = true
 [dependency-groups]
 dev = [
     "mypy>=2.1.0",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.27.0",
     "pytest>=9.0.3",
     "ruff>=0.15.12",
 ]

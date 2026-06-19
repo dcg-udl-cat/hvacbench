@@ -1,73 +1,74 @@
 # hvacbench
 
-A Gym-style digital twin environment for reinforcement learning control of building HVAC systems.
+[![CI](https://github.com/dcg-udl-cat/hvacbench/actions/workflows/ci.yml/badge.svg)](https://github.com/dcg-udl-cat/hvacbench/actions/workflows/ci.yml)
+[![Docs](https://github.com/dcg-udl-cat/hvacbench/actions/workflows/docs.yml/badge.svg)](https://github.com/dcg-udl-cat/hvacbench/actions/workflows/docs.yml)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-2ea44f.svg)](https://dcg-udl-cat.github.io/hvacbench/)
 
-## Overview
-This project implements an RL environment backed by a forecasting model structure acting as a digital twin. It is organized around receding-horizon control logic, meaning the agent provides a full action trajectory for the planning horizon instead of merely a single timestep action.
+Backend-agnostic environments for building HVAC control research.
 
-## Core Abstractions
+`hvacbench` provides a shared receding-horizon environment API for comparing
+HVAC control backends. It is designed for workflows where a policy may be
+trained with a learned digital twin and evaluated against a physics-based
+BOPTEST backend without changing the policy-facing observation and action
+contract.
 
-- **`BaseEnv`**: The environment protocol.
-- **`TTMEnv`**: Provides the simulation loop driven by historical context, future forecasts, and a TinyTimeMixer-compatible model.
-- **`SafeEnv`**: A decorator for safe interactions wrapper. Verifies or adjusts out-of-bounds agent directives.
-- **`BaseProvider`**: Interface for history initialization plus weather and price forecasts. `BestestAirCsvProvider` is the packaged CSV-backed implementation.
-- **`RewardStrategy`**: Exposes flexible logic for optimization goals like comfort range keeping, energy expenditure savings, and system smooth operations calculations. 
-- **`BaseTTM` / `TTM`**: Model interfaces for predicting state trajectories from histories, forecasts, and proposed controls.
-- **`BoptestRolloutEnv`**: A two-simulator BOPTEST backend for horizon rollout scoring.
-- **`BoptestEvaluationEnv`**: A single-simulator BOPTEST backend for realized policy evaluation.
+## Why hvacbench?
 
-This repository contains the reusable library code only. Experiment orchestration
-and training scripts should live in a separate project that imports `hvacbench`.
+Building control experiments often bind together controller code, forecast
+data, simulator access, reward logic, and evaluation protocol. `hvacbench`
+separates those concerns into reusable pieces:
 
-## Dependencies
+- environments expose a consistent control-plan API;
+- providers supply histories, weather forecasts, and electricity prices;
+- model wrappers evaluate learned digital twins;
+- BOPTEST clients evaluate physics-backed rollouts and realized policy steps;
+- reward strategies score comfort, energy cost, and control smoothness.
 
-You need Python `3.13` and `uv`.
+The current implementation includes a TinyTimeMixer-compatible backend, a
+`bestest_air` BOPTEST mapping, mock backends for tests, packaged CSV data
+providers, safety filtering, examples, documentation, and CI workflows.
+
+## Environment contract
+
+At every step, a controller receives past histories and future forecasts, then
+submits a full `(horizon, 2)` control plan with heating and cooling setpoints in
+Celsius. Each backend evaluates the plan according to its semantics and commits
+only the first control row before the environment moves forward by one 15-minute
+timestep.
+
+The three main environments are:
+
+- `TTMEnv`: learned digital-twin backend using TinyTimeMixer-compatible models.
+- `BoptestRolloutEnv`: BOPTEST-backed horizon rollout backend with committed and
+  rollout simulators.
+- `BoptestEvaluationEnv`: single-simulator BOPTEST backend for realized policy
+  evaluation.
 
 ## Installation
 
-```sh
-uv sync --all-extras
+The project currently targets Python `>=3.13,<3.14` and uses `uv` for local
+development.
+
+```bash
+git clone https://github.com/dcg-udl-cat/hvacbench.git
+cd hvacbench
+uv sync --all-extras --group dev
 ```
 
-## Running tests
+Once the package is released, PyPI installation instructions will be added here.
 
-```sh
-uv run pytest
-```
+## Quick start
 
-## Running example
+Run the deterministic mock environment without a trained model or BOPTEST
+server:
 
-```sh
+```bash
 uv run python examples/run_mock_env.py
 ```
 
-## Configuration
-
-`EnvConfig` only contains environment sizing and episode length:
-
-```python
-from hvacbench.config import EnvConfig
-
-config = EnvConfig(
-    history_length=1536,
-    horizon=96,
-    total_simulation_seconds=14 * 24 * 3600,
-)
-```
-
-TTM model column names are supplied separately:
-
-```python
-from hvacbench.config import TTMVariables
-
-variables = TTMVariables()
-```
-
-Pass the same `variables` object to `TTMEnv` and to the real `TTM` model so the
-model preprocessor validation checks the expected state, weather, and control
-columns.
-
-`TTMEnv` can construct the packaged `TTM` wrapper from a model path:
+Minimal learned-digital-twin environment:
 
 ```python
 from hvacbench.config import EnvConfig, TTMVariables
@@ -84,118 +85,79 @@ env = TTMEnv(
     model_path="gft/ttm4hvac",
     variables=variables,
 )
+
+obs, info = env.reset()
+control_plan = env.get_random_control_plan()
+next_obs, reward_value, terminated, truncated, step_info = env.step(control_plan)
 ```
 
 For tests or custom integrations, pass an object implementing `BaseTTM` through
-the `model` argument. In that case `model_path` is not required.
+the `model` argument instead of passing `model_path`.
 
-Create the packaged `bestest_air` CSV provider with one of the available price
-scenarios:
+## BOPTEST backends
 
-```python
-from hvacbench.energy_price import EnergyPriceType
-from hvacbench.providers import BestestAirCsvProvider
-
-provider = BestestAirCsvProvider(
-    config=config,
-    energy_price_type=EnergyPriceType.DYNAMIC,
-    variables=variables,
-)
-```
-
-The provider treats the annual data as cyclic, so forecasts and histories wrap
-across the end of the year instead of truncating the data source. By default it
-uses the packaged repository CSVs; pass `building_data_path` and
-`electricity_price_data_path` to load compatible CSVs from another location.
-
-`TTMEnv(start_day=0)` starts provider lookups at day 0 by default. Pass a
-different non-negative day to offset both initial histories and forecasts into
-the provider data without changing the configured episode length.
-
-## BOPTEST bestest_air Environments
-
-Both BOPTEST environments use the same action contract as `TTMEnv`: the agent
-submits a full `(horizon, 2)` control plan in internal Celsius setpoints.
-
-`BoptestRolloutEnv` uses two independent BOPTEST `bestest_air` testcase
-instances:
-
-- `main_client` is the committed simulator.
-- `rollout_client` is synchronized by replaying the committed first-step
-  controls before evaluating the candidate 96-step control plan.
-
-Use it when you need BOPTEST-backed receding-horizon rollout scores.
+`BoptestRolloutEnv` and `BoptestEvaluationEnv` use the same full-horizon action
+shape as `TTMEnv`. By default, they instantiate the packaged `BestestAir`
+testcase mapping. You can also pass a custom `BoptestTestcase` implementation.
 
 ```python
-import numpy as np
-
 from hvacbench.config import EnvConfig
-from hvacbench.boptest.bestest_air import BestestAir
 from hvacbench.energy_price import EnergyPriceType
 from hvacbench.envs import BoptestRolloutEnv
 from hvacbench.rewards.simple import SimpleReward
 
-config = EnvConfig()
-testcase = BestestAir(
-    base_url="http://127.0.0.1",
-    energy_price_type=EnergyPriceType.DYNAMIC,
-)
+config = EnvConfig(history_length=8, horizon=8)
 reward = SimpleReward(config=config)
 
 env = BoptestRolloutEnv(
-    reward=reward,
     config=config,
-    testcase=testcase,
+    reward=reward,
+    energy_price_type=EnergyPriceType.DYNAMIC,
     start_day=0,
 )
-
-control_plan = np.tile(
-    np.array([[21.0, 24.0]], dtype=np.float64),
-    (config.horizon, 1),
-)
-next_obs, reward_value, terminated, truncated, step_info = env.step(control_plan)
 ```
 
-The shadow simulator is synchronized by reinitializing the rollout testcase,
-advancing through the fixed initial context, and replaying all committed
-first-step controls before the 96-step candidate rollout. This prioritizes
-correct receding-horizon semantics over speed.
+`BoptestRolloutEnv` requires a running BOPTEST service with enough workers for
+two simultaneous `bestest_air` testcase instances. Use it when a controller
+needs BOPTEST-backed horizon rollout scores.
 
-`BoptestEvaluationEnv` is the evaluation-oriented BOPTEST backend. It accepts
-the same full-horizon action shape, but uses one BOPTEST simulator, applies only
-the first control row, and computes reward from the realized one-step
-transition. Use it for final realized policy evaluation.
+`BoptestEvaluationEnv` uses one BOPTEST simulator, applies only the first
+control row, and computes reward from the realized one-step transition. Use it
+for final realized policy evaluation.
 
-Run the live BOPTEST rollout example with:
+Run a live rollout smoke test with:
 
-```sh
+```bash
 uv run python examples/run_bestest_air_boptest_rollout_env.py
 ```
 
-It requires a running BOPTEST service with enough workers for two simultaneous
-`bestest_air` testcase instances. The example uses a small `history_length=8`
-and `horizon=8` smoke-test configuration so it finishes quickly; the default
-research configuration remains `history_length=1536` and `horizon=96`.
+## Documentation
 
-### bestest_air Assumptions
+The documentation site is configured for GitHub Pages:
 
-- Only the `bestest_air` testcase is supported.
-- Heating and cooling setpoints are internal Celsius values and are sent to
-  BOPTEST as Kelvin.
-- Room air temperature is read from Kelvin and converted back to Celsius.
-- HVAC power is approximated as
-  `fcu_reaPCoo_y + fcu_reaPFan_y + fcu_reaPHea_y`. `fcu_reaPHea_y` is thermal
-  heating power, not necessarily electrical power, so this is a pragmatic first
-  signal for the existing internal reward.
-- The electricity price forecast point is selected from
-  `PriceElectricPowerConstant`, `PriceElectricPowerDynamic`, or
-  `PriceElectricPowerHighlyDynamic` based on `BestestAir.energy_price_type`.
-- `start_day` is converted to BOPTEST `start_time` seconds during
-  `/initialize`; after that, the environment advances the configured initial
-  history context before the first control step.
-- BOPTEST `/forecast` returns `horizon / interval + 1` rows, so the environment
-  requests `(steps - 1) * 900` seconds to receive exactly `steps` rows.
-- BOPTEST `/results` is used only for measurement points. Forecast-only weather
-  points such as `TDryBul` are read through `/forecast`, including the initial
-  weather history window captured before the context warmup is advanced.
-- Initial controls are filled with the default setpoints `[21.0, 24.0]`.
+https://dcg-udl-cat.github.io/hvacbench/
+
+Build it locally with:
+
+```bash
+uv run mkdocs build --strict
+```
+
+## Development checks
+
+```bash
+uv lock --check
+uv run ruff check src tests examples
+uv run pytest
+uv build
+```
+
+## Publication status
+
+`hvacbench` is pre-1.0 research software being prepared for public release,
+PyPI packaging, and a SoftwareX submission. Remaining release and manuscript
+tasks are tracked in [PUBLICATION_TODO.md](PUBLICATION_TODO.md).
+
+## License
+
+`hvacbench` is distributed under the MIT license. See [LICENSE.txt](LICENSE.txt).

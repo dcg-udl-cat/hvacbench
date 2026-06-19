@@ -5,4 +5,14 @@ __pycache__/
 .idea/
 .mypy_cache/
 .ruff_cache/
+dist/
+build/
+site/
+*.egg-info/
+.coverage
+coverage.xml
+htmlcov/
+.env
+.env.*
+.DS_Store
 prompt*
